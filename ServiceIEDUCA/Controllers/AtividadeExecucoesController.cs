@@ -223,17 +223,15 @@ namespace ServiceIEDUCA.Controllers
             try
             {
                 var execucoes = await _context.AtividadeExecucoes
-                    .Include(e => e.User)
-                    .Include(e => e.Atividade)
                     .Where(e => e.UserId == userId && e.AtividadeId == atividadeId)
                     .OrderByDescending(e => e.CriadoEm)
                     .Select(e => new AtividadeExecucaoDto
                     {
                         Id = e.Id,
                         UserId = e.UserId,
-                        UserNome = e.User != null ? e.User.Nome : "",
+                        UserNome = "",
                         AtividadeId = e.AtividadeId,
-                        AtividadeNome = e.Atividade != null ? e.Atividade.Nome : "",
+                        AtividadeNome = $"Atividade {e.AtividadeId}",
                         DataInicio = e.DataInicio,
                         DataFim = e.DataFim,
                         TotalQuestoes = e.TotalQuestoes,
@@ -263,17 +261,15 @@ namespace ServiceIEDUCA.Controllers
             try
             {
                 var execucoes = await _context.AtividadeExecucoes
-                    .Include(e => e.User)
-                    .Include(e => e.Atividade)
                     .Where(e => e.AtividadeId == atividadeId)
                     .OrderByDescending(e => e.CriadoEm)
                     .Select(e => new AtividadeExecucaoDto
                     {
                         Id = e.Id,
                         UserId = e.UserId,
-                        UserNome = e.User != null ? e.User.Nome : "",
+                        UserNome = "",
                         AtividadeId = e.AtividadeId,
-                        AtividadeNome = e.Atividade != null ? e.Atividade.Nome : "",
+                        AtividadeNome = $"Atividade {e.AtividadeId}",
                         DataInicio = e.DataInicio,
                         DataFim = e.DataFim,
                         TotalQuestoes = e.TotalQuestoes,
@@ -499,3 +495,4 @@ namespace ServiceIEDUCA.Controllers
         }
     }
 }
+

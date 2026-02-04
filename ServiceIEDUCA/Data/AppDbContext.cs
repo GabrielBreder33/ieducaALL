@@ -19,6 +19,12 @@ namespace ServiceIEDUCA.Data
         public DbSet<AtividadeQuestaoResultados> AtividadeQuestaoResultados { get; set; }
         public DbSet<Escola> escola { get; set; }
 
+        public DbSet<RedacaoCorrecoes> RedacaoCorrecoes { get; set; }
+        public DbSet<RedacaoCompetencias> RedacaoCompetencias { get; set; }
+        public DbSet<RedacaoErrosGramaticais> RedacaoErrosGramaticais { get; set; }
+        public DbSet<RedacaoFeedbacks> RedacaoFeedbacks { get; set; }
+        public DbSet<RedacaoPropostaIntervencao> RedacaoPropostaIntervencao { get; set; }
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -64,17 +70,16 @@ namespace ServiceIEDUCA.Data
                 entity.Property(e => e.CriadoEm).HasDefaultValueSql("GETDATE()");
                 entity.Property(e => e.Status).HasMaxLength(20).HasDefaultValue("Em Andamento");
 
-                // Relacionamento com User
-                entity.HasOne(e => e.User)
-                    .WithMany()
-                    .HasForeignKey(e => e.UserId)
-                    .OnDelete(DeleteBehavior.Restrict);
+                // Relacionamentos comentados - não necessários pois usamos Select() direto
+                // entity.HasOne(e => e.User)
+                //     .WithMany()
+                //     .HasForeignKey(e => e.UserId)
+                //     .OnDelete(DeleteBehavior.Restrict);
 
-                // Relacionamento com Atividades
-                entity.HasOne(e => e.Atividade)
-                    .WithMany(a => a.Execucoes)
-                    .HasForeignKey(e => e.AtividadeId)
-                    .OnDelete(DeleteBehavior.Restrict);
+                // entity.HasOne(e => e.Atividade)
+                //     .WithMany(a => a.Execucoes)
+                //     .HasForeignKey(e => e.AtividadeId)
+                //     .OnDelete(DeleteBehavior.Restrict);
 
                 // ÍNDICES ESTRATÉGICOS PARA PERFORMANCE E BI
                 // Índice composto: histórico e evolução do aluno
@@ -114,6 +119,13 @@ namespace ServiceIEDUCA.Data
                 // Índice: análise por resultado (acertos/erros)
                 entity.HasIndex(e => e.Resultado)
                     .HasDatabaseName("IX_AtividadeQuestaoResultados_Resultado");
+            });
+
+            // Configuração: RedacaoCorrecoes
+            modelBuilder.Entity<RedacaoCorrecoes>(entity =>
+            {
+                entity.Property(e => e.NotaTotal)
+                    .HasColumnType("int");
             });
         }
     }

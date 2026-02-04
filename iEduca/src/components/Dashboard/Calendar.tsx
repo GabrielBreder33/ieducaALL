@@ -18,9 +18,10 @@ interface CalendarDay {
 interface CalendarProps {
   darkMode?: boolean;
   userId?: number; // ID do usuário para visualizar o calendário
+  atividadesRealizadas?: Array<{ data: string; tipo: string; nota: number }>; // Atividades externas
 }
 
-export default function Calendar({ darkMode = true, userId }: CalendarProps) {
+export default function Calendar({ darkMode = true, userId, atividadesRealizadas }: CalendarProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [calendarDays, setCalendarDays] = useState<CalendarDay[]>([]);
   const [loading, setLoading] = useState(true);
@@ -32,20 +33,34 @@ export default function Calendar({ darkMode = true, userId }: CalendarProps) {
 
   useEffect(() => {
     loadCalendarData();
-  }, [currentDate, userId]);
+  }, [currentDate, userId, atividadesRealizadas]); // Adicionar atividadesRealizadas como dependência
 
   const loadCalendarData = async () => {
     try {
-      // Se userId foi passado, usar ele; caso contrário, pegar do usuário logado
-      let userIdToUse = userId;
-      if (!userIdToUse) {
-        const user = authService.getCurrentUser();
-        if (!user) return;
-        userIdToUse = user.id;
-      }
+      let historicoParaUsar: any[] = [];
+      
+      // Se atividadesRealizadas foi passado, usar ele
+      if (atividadesRealizadas && atividadesRealizadas.length > 0) {
+        // Converter para formato esperado
+        historicoParaUsar = atividadesRealizadas.map(a => ({
+          dataInicio: a.data,
+          dataFim: a.data,
+          nota: a.nota,
+          status: 'Concluída',
+          id: Math.random() // ID temporário
+        }));
+      } else {
+        // Caso contrário, buscar da API (comportamento original)
+        let userIdToUse = userId;
+        if (!userIdToUse) {
+          const user = authService.getCurrentUser();
+          if (!user) return;
+          userIdToUse = user.id;
+        }
 
-      // Buscar histórico de atividades
-      const historico = await atividadeService.getHistoricoUsuario(userIdToUse);
+        // Buscar histórico de atividades
+        historicoParaUsar = await atividadeService.getHistoricoUsuario(userIdToUse);
+      }
       
       // Gerar dias do calendário
       const year = currentDate.getFullYear();
@@ -78,7 +93,7 @@ export default function Calendar({ darkMode = true, userId }: CalendarProps) {
         date.setHours(0, 0, 0, 0);
         
         // Filtrar atividades deste dia
-        const atividadesDoDia = historico.filter(atividade => {
+        const atividadesDoDia = historicoParaUsar.filter(atividade => {
           const atividadeDate = new Date(atividade.dataFim || atividade.dataInicio);
           atividadeDate.setHours(0, 0, 0, 0);
           return atividadeDate.getTime() === date.getTime();
@@ -170,26 +185,66 @@ export default function Calendar({ darkMode = true, userId }: CalendarProps) {
   const getStreakInfo = () => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    const currentYear = today.getFullYear();
+    const currentMonth = today.getMonth();
+    const currentDay = today.getDate();
     
     let currentStreak = 0;
     let maxStreak = 0;
     let tempStreak = 0;
     
+    // Verificar se existe atividade HOJE
+    const todayHasActivity = calendarDays.find(d => 
+      d.day === currentDay && 
+      d.isCurrentMonth && 
+      d.atividadesCount > 0
+    );
+    
+    // Se hoje não tem atividade, sequência atual é 0
+    if (!todayHasActivity) {
+      // Mas ainda calcula a melhor sequência de todos os tempos
+      const sortedDays = [...calendarDays]
+        .filter(d => d.isCurrentMonth)
+        .sort((a, b) => a.day - b.day); // Ordem crescente
+      
+      for (const day of sortedDays) {
+        if (day.atividadesCount > 0) {
+          tempStreak++;
+          if (tempStreak > maxStreak) maxStreak = tempStreak;
+        } else {
+          tempStreak = 0;
+        }
+      }
+      
+      return { currentStreak: 0, maxStreak };
+    }
+    
+    // Contar sequência atual (de hoje para trás)
+    for (let i = currentDay; i >= 1; i--) {
+      const dayData = calendarDays.find(d => d.day === i && d.isCurrentMonth);
+      
+      if (dayData && dayData.atividadesCount > 0) {
+        currentStreak++;
+      } else {
+        break; // Para quando encontrar um dia sem atividade
+      }
+    }
+    
+    // Calcular melhor sequência de todos os tempos
     const sortedDays = [...calendarDays]
       .filter(d => d.isCurrentMonth)
-      .sort((a, b) => b.day - a.day);
-
+      .sort((a, b) => a.day - b.day); // Ordem crescente
+    
     for (const day of sortedDays) {
       if (day.atividadesCount > 0) {
         tempStreak++;
         if (tempStreak > maxStreak) maxStreak = tempStreak;
       } else {
-        if (currentStreak === 0) currentStreak = tempStreak;
         tempStreak = 0;
       }
     }
 
-    return { currentStreak: currentStreak || tempStreak, maxStreak };
+    return { currentStreak, maxStreak };
   };
 
   const streak = getStreakInfo();

@@ -18,6 +18,15 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 // Registro dos serviços
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IConhecimentoService, ConhecimentoService>();
+builder.Services.AddScoped<IRedacaoCorrecaoService, RedacaoCorrecaoService>();
+builder.Services.AddScoped<IDeepSeekService, DeepSeekService>();
+
+// Adicionar HttpClient para chamadas à API
+builder.Services.AddHttpClient<IRedacaoCorrecaoService, RedacaoCorrecaoService>();
+builder.Services.AddHttpClient<IDeepSeekService, DeepSeekService>();
+
+// Adicionar BackgroundService para processar correções
+builder.Services.AddHostedService<RedacaoBackgroundService>();
 
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();

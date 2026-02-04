@@ -45,6 +45,8 @@ export interface EstatisticasUsuario {
   acertos: number;
   erros: number;
   mediaNotas: number;
+  mediaNotasAtividades: number;
+  mediaNotasRedacoes: number;
   tempoTotalSegundos: number;
   ultimasAtividades: Array<{
     data: string;
@@ -69,8 +71,6 @@ class AtividadeService {
         body: JSON.stringify(data),
       });
 
-      console.log('📡 Resposta recebida. Status:', response.status, response.statusText);
-
       if (!response.ok) {
         const error = await response.text();
         console.error('❌ Erro da API:', error);
@@ -78,7 +78,6 @@ class AtividadeService {
       }
 
       const result = await response.json();
-      console.log('✅ Dados recebidos:', result);
       return result;
     } catch (error: any) {
       console.error('🔥 Erro capturado:', error);

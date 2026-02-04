@@ -41,9 +41,34 @@ namespace ServiceIEDUCA.Models
         [MaxLength(20)]
         public string Status { get; set; } = "Em Andamento"; // Em Andamento, Concluída, Abandonada
 
-        // Relacionamentos
-        [ForeignKey("UserId")]
-        public virtual User? User { get; set; }
+    // Campos para Atividades Geradas por IA
+    [MaxLength(100)]
+    public string? Materia { get; set; }
+
+    [MaxLength(50)]
+    public string? Segmento { get; set; }
+
+    [MaxLength(50)]
+    public string? Ano { get; set; }
+
+    [MaxLength(500)]
+    public string? Conteudo { get; set; }
+
+    [MaxLength(50)]
+    public string? Nivel { get; set; }
+
+    [MaxLength(50)]
+    public string? Tipo { get; set; }
+
+    public bool GeradaPorIA { get; set; } = false;
+
+    // Campos JSON para armazenar questões, gabaritos e respostas (para atividades IA)
+    public string? QuestoesJson { get; set; }
+    public string? GabaritoJson { get; set; }
+    public string? RespostasJson { get; set; }
+
+    public DateTime AtualizadoEm { get; set; } = DateTime.Now;
+
 
         [ForeignKey("AtividadeId")]
         public virtual Atividades? Atividade { get; set; }

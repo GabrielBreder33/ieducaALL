@@ -38,8 +38,6 @@ class AuthService {
         idEscola 
       };
       
-      console.log('Enviando cadastro:', payload);
-      
       const response = await fetch(`${API_URL}/User`, {
         method: 'POST',
         headers: {
