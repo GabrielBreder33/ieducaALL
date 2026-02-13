@@ -19,7 +19,6 @@ namespace ServiceIEDUCA.Controllers
             _logger = logger;
         }
 
-        // GET: api/Atividades
         [HttpGet]
         public async Task<ActionResult<IEnumerable<AtividadeDto>>> GetAll()
         {
