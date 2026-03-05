@@ -1,3 +1,4 @@
+using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 
@@ -11,6 +12,8 @@ namespace ServiceIEDUCA.Services
         private readonly string _apiKey;
         private readonly string _baseUrl;
         private readonly string _model;
+        private readonly int _maxTokensAtividade;
+        private readonly double _temperatureAtividade;
 
         public DeepSeekService(
             HttpClient httpClient,
@@ -24,55 +27,77 @@ namespace ServiceIEDUCA.Services
             _apiKey = _configuration["DeepSeek:ApiKey"] ?? throw new Exception("DeepSeek ApiKey não configurada");
             _baseUrl = _configuration["DeepSeek:BaseUrl"] ?? "https://api.deepseek.com/v1";
             _model = _configuration["DeepSeek:Model"] ?? "deepseek-chat";
+            _maxTokensAtividade = _configuration.GetValue<int?>("DeepSeek:MaxTokensAtividade") ?? 4000;
+            _temperatureAtividade = _configuration.GetValue<double?>("DeepSeek:TemperatureAtividade") ?? 0.3;
         }
 
-        public async Task<string> GerarAtividadeAsync(string prompt)
+        public async Task<string> GerarAtividadeAsync(string prompt, int? maxTokensOverride = null, CancellationToken cancellationToken = default)
         {
-            try
+            var maxTokens = maxTokensOverride ?? _maxTokensAtividade;
+            var requestBody = new
             {
-                _logger.LogInformation("Gerando atividade com DeepSeek");
-
-                var requestBody = new
+                model = _model,
+                messages = new[]
                 {
-                    model = _model,
-                    messages = new[]
+                    new { role = "system", content = "Você é um professor especialista criando questões de múltipla escolha para estudantes brasileiros. Sempre retorne as questões em formato JSON válido." },
+                    new { role = "user", content = prompt }
+                },
+                temperature = _temperatureAtividade,
+                max_tokens = maxTokens,
+                response_format = new { type = "json_object" }
+            };
+
+            var json = JsonSerializer.Serialize(requestBody);
+
+            _logger.LogInformation("DeepSeek geração: Model={Model}, MaxTokens={MaxTokens}, Temperature={Temperature}", _model, maxTokens, _temperatureAtividade);
+
+            // Retry logic: 3 attempts with exponential backoff
+            const int maxAttempts = 3;
+            int attempt = 0;
+            while (true)
+            {
+                attempt++;
+                try
+                {
+                    using var request = new HttpRequestMessage(HttpMethod.Post, $"{_baseUrl}/chat/completions");
+                    request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
+                    request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+                    request.Content = new StringContent(json, Encoding.UTF8, "application/json");
+
+                    var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+                    var responseContent = await response.Content.ReadAsStringAsync(cancellationToken);
+
+                    if (!response.IsSuccessStatusCode)
                     {
-                        new { role = "system", content = "Você é um professor especialista criando questões de múltipla escolha para estudantes brasileiros. Sempre retorne as questões em formato JSON válido." },
-                        new { role = "user", content = prompt }
-                    },
-                    temperature = 0.7,
-                    max_tokens = 4000
-                };
+                        _logger.LogError("Erro na API DeepSeek: {Status} - {Body}", response.StatusCode, responseContent);
+                        throw new Exception($"Erro na API DeepSeek: {response.StatusCode}");
+                    }
 
-                var json = JsonSerializer.Serialize(requestBody);
-                var content = new StringContent(json, Encoding.UTF8, "application/json");
+                    var result = JsonSerializer.Deserialize<JsonElement>(responseContent);
+                    var messageContent = result
+                        .GetProperty("choices")[0]
+                        .GetProperty("message")
+                        .GetProperty("content")
+                        .GetString();
 
-                _httpClient.DefaultRequestHeaders.Clear();
-                _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {_apiKey}");
-
-                var response = await _httpClient.PostAsync($"{_baseUrl}/chat/completions", content);
-                var responseContent = await response.Content.ReadAsStringAsync();
-
-                if (!response.IsSuccessStatusCode)
+                    _logger.LogInformation("Atividade gerada com sucesso (attempt {Attempt})", attempt);
+                    return messageContent ?? string.Empty;
+                }
+                catch (TaskCanceledException tex)
                 {
-                    _logger.LogError($"Erro na API DeepSeek: {response.StatusCode} - {responseContent}");
-                    throw new Exception($"Erro na API DeepSeek: {response.StatusCode}");
+                    _logger.LogWarning(tex, "Timeout/cancelamento ao chamar DeepSeek (attempt {Attempt})", attempt);
+                    if (attempt >= maxAttempts) throw;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Erro ao chamar DeepSeek (attempt {Attempt})", attempt);
+                    if (attempt >= maxAttempts) throw;
                 }
 
-                var result = JsonSerializer.Deserialize<JsonElement>(responseContent);
-                var messageContent = result
-                    .GetProperty("choices")[0]
-                    .GetProperty("message")
-                    .GetProperty("content")
-                    .GetString();
-
-                _logger.LogInformation("Atividade gerada com sucesso");
-                return messageContent ?? "";
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Erro ao gerar atividade com DeepSeek");
-                throw;
+                // Exponential backoff before retrying
+                var backoffMs = 500 * (int)Math.Pow(2, attempt - 1);
+                _logger.LogInformation("Aguardando {BackoffMs}ms antes de nova tentativa...", backoffMs);
+                await Task.Delay(backoffMs);
             }
         }
     }

@@ -2,12 +2,13 @@
 
 export type Materia = 'Matemática' | 'Linguagens' | 'Ciências da Natureza' | 'Ciências Humanas';
 
-export type Segmento = 'Fundamental I' | 'Fundamental II' | 'Ensino Médio' | 'ENEM';
+export type Segmento = 'Fundamental I' | 'Fundamental II' | 'Ensino Médio' | 'ENEM' | 'Concurso';
 
 export type AnoEscolar = 
   | '1º ano' | '2º ano' | '3º ano' | '4º ano' | '5º ano'  // Fund I
   | '6º ano' | '7º ano' | '8º ano' | '9º ano'              // Fund II
-  | '1º EM' | '2º EM' | '3º EM';                           // Ensino Médio
+  | '1º EM' | '2º EM' | '3º EM'                            // Ensino Médio
+  | 'Concurso';                                            // Concurso
 
 export type NivelDificuldade = 'Fácil' | 'Médio' | 'Difícil';
 
@@ -17,6 +18,7 @@ export interface ConfiguracaoAtividade {
   materia: Materia;
   segmento: Segmento;
   ano: AnoEscolar;
+  concurso?: string;
   conteudo: string;
   nivel: NivelDificuldade;
   quantidade: 5 | 10 | 15;
@@ -93,6 +95,8 @@ export const getAnosPorSegmento = (segmento: Segmento): AnoEscolar[] => {
     case 'Ensino Médio':
     case 'ENEM':
       return ['1º EM', '2º EM', '3º EM'];
+    case 'Concurso':
+      return ['Concurso'];
     default:
       return [];
   }

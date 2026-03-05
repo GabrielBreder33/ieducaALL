@@ -32,7 +32,7 @@ namespace ServiceIEDUCA.Models
         [MaxLength(100)]
         public string? TopicoEspecifico { get; set; } // Para análise granular
 
-        public DateTime CriadoEm { get; set; } = DateTime.Now;
+        public DateTime CriadoEm { get; set; } = DateTime.UtcNow;
 
         // Relacionamento
         [ForeignKey("ExecucaoId")]

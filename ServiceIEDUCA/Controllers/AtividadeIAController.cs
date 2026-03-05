@@ -5,6 +5,7 @@ using ServiceIEDUCA.DTOs;
 using ServiceIEDUCA.Models;
 using ServiceIEDUCA.Services;
 using System.Text.Json;
+using Microsoft.AspNetCore.Http;
 
 namespace ServiceIEDUCA.Controllers
 {
@@ -34,20 +35,27 @@ namespace ServiceIEDUCA.Controllers
             {
                 _logger.LogInformation($"Buscando histórico de atividades IA para o usuário {userId}");
 
+                var atividadesIaUsuario = _context.AtividadeExecucoes
+                    .Where(e => e.UserId == userId)
+                    .Where(e =>
+                        e.GeradaPorIA == true ||
+                        e.AtividadeId == 0 ||
+                        !string.IsNullOrEmpty(e.QuestoesJson) ||
+                        !string.IsNullOrEmpty(e.GabaritoJson));
+
                 // Primeiro, contar TODAS as atividades IA do usuário
-                var totalTodasAtividades = await _context.AtividadeExecucoes
-                    .Where(e => e.UserId == userId && e.GeradaPorIA == true)
+                var totalTodasAtividades = await atividadesIaUsuario
                     .CountAsync();
                     
-                var totalConcluidas = await _context.AtividadeExecucoes
-                    .Where(e => e.UserId == userId && e.GeradaPorIA == true && e.Status == "Concluída")
+                var totalConcluidas = await atividadesIaUsuario
+                    .Where(e => !string.IsNullOrEmpty(e.Status) && e.Status!.ToLower().StartsWith("conclu"))
                     .CountAsync();
                     
                 _logger.LogInformation($"📊 Usuário {userId}: {totalTodasAtividades} atividades IA no total, {totalConcluidas} concluídas");
 
                 // Buscar todas as execuções de atividades IA do usuário
-                var execucoes = await _context.AtividadeExecucoes
-                    .Where(e => e.UserId == userId && e.GeradaPorIA == true && e.Status == "Concluída")
+                var execucoes = await atividadesIaUsuario
+                    .Where(e => !string.IsNullOrEmpty(e.Status) && e.Status!.ToLower().StartsWith("conclu"))
                     .OrderByDescending(e => e.DataInicio)
                     .Take(100)
                     .Select(e => new
@@ -92,7 +100,12 @@ namespace ServiceIEDUCA.Controllers
                 _logger.LogInformation($"Buscando detalhes da execução {execucaoId} para o usuário {userId}");
 
                 var execucao = await _context.AtividadeExecucoes
-                    .Where(e => e.UserId == userId && e.Id == execucaoId && e.GeradaPorIA == true)
+                    .Where(e => e.UserId == userId && e.Id == execucaoId)
+                    .Where(e =>
+                        e.GeradaPorIA == true ||
+                        e.AtividadeId == 0 ||
+                        !string.IsNullOrEmpty(e.QuestoesJson) ||
+                        !string.IsNullOrEmpty(e.GabaritoJson))
                     .FirstOrDefaultAsync();
 
                 if (execucao == null)
@@ -168,18 +181,126 @@ namespace ServiceIEDUCA.Controllers
         [HttpPost("gerar")]
         public async Task<ActionResult<object>> GerarAtividade([FromBody] GerarAtividadeRequestNovo request)
         {
-            string? respostaIA = null;
+            var requisicaoInicio = DateTime.UtcNow;
             try
             {
-                _logger.LogInformation($"Gerando atividade IA: Matéria={request.Configuracao?.Materia}, Nível={request.Configuracao?.Nivel}, Quantidade={request.Configuracao?.Quantidade}");
+                var atividade = await GerarAtividadeProcessoAsync(request);
+                return Ok(atividade);
+            }
+            catch (TimeoutException ex)
+            {
+                _logger.LogWarning(ex, "Timeout ao gerar atividade IA");
+                await GarantirDuracaoMinimaAsync(requisicaoInicio, TimeSpan.FromMinutes(2));
+                return StatusCode(StatusCodes.Status504GatewayTimeout, new { message = "Timeout ao gerar atividade IA", error = ex.Message });
+            }
+            catch (JsonException ex)
+            {
+                _logger.LogError(ex, "Resposta inválida da IA ao gerar atividade");
+                await GarantirDuracaoMinimaAsync(requisicaoInicio, TimeSpan.FromMinutes(2));
+                return StatusCode(StatusCodes.Status502BadGateway, new { message = "Resposta inválida da IA", error = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Erro ao gerar atividade IA");
+                await GarantirDuracaoMinimaAsync(requisicaoInicio, TimeSpan.FromMinutes(2));
+                return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Erro ao gerar atividade IA", error = ex.Message });
+            }
+        }
 
-                // Construir prompt detalhado para o DeepSeek
-                var prompt = $@"Gere {request.Configuracao?.Quantidade} questões de múltipla escolha sobre {request.Configuracao?.Conteudo} para {request.Configuracao?.Materia}.
+        // POST: api/AtividadeIA/gerar-stream
+        [HttpPost("gerar-stream")]
+        public async Task GerarAtividadeStream([FromBody] GerarAtividadeRequestNovo request)
+        {
+            var requisicaoInicio = DateTime.UtcNow;
+            Response.StatusCode = 200;
+            Response.ContentType = "application/x-ndjson; charset=utf-8";
+            Response.Headers["Cache-Control"] = "no-cache";
+            Response.Headers["X-Accel-Buffering"] = "no";
+
+            async Task EnviarEventoAsync(object evento)
+            {
+                var linha = JsonSerializer.Serialize(evento) + "\n";
+                await Response.WriteAsync(linha);
+                await Response.Body.FlushAsync();
+            }
+
+            await EnviarEventoAsync(new { type = "progress", percent = 5, message = "Iniciando geração..." });
+
+            try
+            {
+                var atividade = await GerarAtividadeProcessoAsync(
+                    request,
+                    async (percent, message) => await EnviarEventoAsync(new { type = "progress", percent, message })
+                );
+
+                await EnviarEventoAsync(new { type = "completed", percent = 100, message = "Atividade pronta!", atividade });
+            }
+            catch (TimeoutException ex)
+            {
+                _logger.LogWarning(ex, "Timeout na geração IA (stream)");
+                await GarantirDuracaoMinimaAsync(requisicaoInicio, TimeSpan.FromMinutes(2));
+                await EnviarEventoAsync(new { type = "error", message = "Timeout ao gerar atividade IA: " + ex.Message });
+            }
+            catch (JsonException ex)
+            {
+                _logger.LogError(ex, "Resposta inválida da IA (stream)");
+                await GarantirDuracaoMinimaAsync(requisicaoInicio, TimeSpan.FromMinutes(2));
+                await EnviarEventoAsync(new { type = "error", message = "Resposta inválida da IA: " + ex.Message });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Erro inesperado na geração IA (stream)");
+                await GarantirDuracaoMinimaAsync(requisicaoInicio, TimeSpan.FromMinutes(2));
+                await EnviarEventoAsync(new { type = "error", message = "Erro ao gerar atividade IA: " + ex.Message });
+            }
+        }
+
+        private async Task<object> GerarAtividadeProcessoAsync(
+            GerarAtividadeRequestNovo request,
+            Func<int, string, Task>? onProgress = null)
+        {
+            string? respostaIA = null;
+            var inicio = DateTime.UtcNow;
+            var quantidade = request.Configuracao?.Quantidade ?? 10;
+
+            async Task Report(int percent, string message)
+            {
+                if (onProgress != null)
+                {
+                    await onProgress(percent, message);
+                }
+            }
+
+            try
+            {
+                _logger.LogInformation($"Gerando atividade IA: Matéria={request.Configuracao?.Materia}, Nível={request.Configuracao?.Nivel}, Quantidade={quantidade}");
+                await Report(10, "Preparando solicitação...");
+
+                var modoRapido = quantidade >= 10;
+
+                var tokensPorQuestao = (request.Configuracao?.Explicacao ?? false) ? 150 : 110;
+                var maxTokensParaRequisicao = Math.Clamp(quantidade * tokensPorQuestao + 300, 800, 2600);
+
+                var explicacaoCurta = quantidade >= 10
+                    ? "Explicação curta (máx. 120 caracteres por questão)."
+                    : "Explicação breve e objetiva por questão.";
+
+                var contextoConcurso = string.Empty;
+                if (string.Equals(request.Configuracao?.Segmento, "Concurso", StringComparison.OrdinalIgnoreCase)
+                    && !string.IsNullOrWhiteSpace(request.Configuracao?.Concurso))
+                {
+                    contextoConcurso = $@"
+- Concurso alvo: {request.Configuracao?.Concurso}
+- As questões devem seguir o padrão de cobrança e estilo desse concurso (nível, linguagem e perfil de banca).";
+                }
+
+                var prompt = $@"Gere {quantidade} questões de múltipla escolha sobre {request.Configuracao?.Conteudo} para {request.Configuracao?.Materia}.
 
 CONFIGURAÇÃO:
 - Público: Alunos do {request.Configuracao?.Ano} - {request.Configuracao?.Segmento}
 - Nível de dificuldade: {request.Configuracao?.Nivel}
-- Quantidade: {request.Configuracao?.Quantidade} questões
+- Quantidade: {quantidade} questões
+{contextoConcurso}
 
 REGRAS OBRIGATÓRIAS:
 1. Cada questão deve ter exatamente 4 alternativas (A, B, C, D)
@@ -188,6 +309,8 @@ REGRAS OBRIGATÓRIAS:
 4. Linguagem adequada ao nível escolar ({request.Configuracao?.Ano})
 5. Enunciados claros e objetivos
 6. Contextualize com situações do cotidiano
+7. Mantenha enunciados curtos (máx. 180 caracteres)
+8. Mantenha alternativas curtas (máx. 90 caracteres)
 
 FORMATO DE SAÍDA (JSON VÁLIDO):
 {{
@@ -205,23 +328,57 @@ FORMATO DE SAÍDA (JSON VÁLIDO):
   ],
   ""gabarito"": [
     {{""questao"": 1, ""respostaCorreta"": ""A""}}
-  ],
-  ""explicacoes"": [
-    {{""questao"": 1, ""explicacao"": ""[EXPLICAÇÃO DETALHADA DA RESPOSTA CORRETA E POR QUE AS OUTRAS ESTÃO ERRADAS]""}}
-  ]
+  ]{(modoRapido ? string.Empty : ",\n  \"explicacoes\": [\n    {\"questao\": 1, \"explicacao\": \"[EXPLICAÇÃO CURTA DA RESPOSTA CORRETA]\"}\n  ]")}
 }}
+
+OBSERVAÇÃO SOBRE EXPLICAÇÕES:
+- {(modoRapido ? "No modo rápido, NÃO envie o bloco explicacoes." : explicacaoCurta)}
 
 IMPORTANTE: Retorne APENAS o JSON, sem texto adicional antes ou depois.";
 
-                // Chamar DeepSeek
-                respostaIA = await _deepSeekService.GerarAtividadeAsync(prompt);
-                
+                await Report(25, "Enviando para IA...");
+
+                // Criar CancellationTokenSource para cancelar a chamada se exceder o tempo limite
+                var timeoutSeconds = 180;
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(timeoutSeconds));
+                var tarefaGeracao = _deepSeekService.GerarAtividadeAsync(prompt, maxTokensParaRequisicao, cts.Token);
+
+                var progressoTimer = Task.Run(async () =>
+                {
+                    var percentual = 35;
+                    while (!tarefaGeracao.IsCompleted && percentual < 90)
+                    {
+                        await Task.Delay(TimeSpan.FromSeconds(2));
+                        if (tarefaGeracao.IsCompleted)
+                        {
+                            break;
+                        }
+
+                        await Report(percentual, "Gerando questões...");
+                        percentual += 10;
+                    }
+                });
+
+                var tarefaConcluida = await Task.WhenAny(tarefaGeracao, Task.Delay(TimeSpan.FromSeconds(timeoutSeconds)));
+
+                if (tarefaConcluida != tarefaGeracao)
+                {
+                    // Cancela explicitamente a requisição pendente para evitar trabalho em segundo plano
+                    try { cts.Cancel(); } catch {}
+                    _logger.LogWarning("Timeout ao gerar atividade IA após {Timeout}s. Matéria={Materia}, Quantidade={Quantidade}", timeoutSeconds, request.Configuracao?.Materia, quantidade);
+                    await Report(95, $"Tempo limite ({timeoutSeconds}s) atingido ao consultar a IA.");
+                    throw new TimeoutException($"Timeout ao gerar atividade IA para Matéria={request.Configuracao?.Materia}, Quantidade={quantidade}");
+                }
+
+                await progressoTimer;
+                respostaIA = await tarefaGeracao;
+
+                await Report(92, "Processando resposta...");
+
                 _logger.LogInformation($"Resposta bruta do DeepSeek (primeiros 500 caracteres): {respostaIA.Substring(0, Math.Min(500, respostaIA.Length))}");
-                
-                // Limpar possíveis marcações de código e texto adicional
+
                 respostaIA = respostaIA.Trim();
-                
-                // Remover blocos de código markdown
+
                 if (respostaIA.StartsWith("```json"))
                 {
                     respostaIA = respostaIA.Substring(7);
@@ -230,83 +387,189 @@ IMPORTANTE: Retorne APENAS o JSON, sem texto adicional antes ou depois.";
                 {
                     respostaIA = respostaIA.Substring(3);
                 }
-                
+
                 if (respostaIA.EndsWith("```"))
                 {
                     respostaIA = respostaIA.Substring(0, respostaIA.Length - 3);
                 }
-                
+
                 respostaIA = respostaIA.Trim();
-                
-                // Tentar encontrar o JSON válido na resposta
+
                 int startIndex = respostaIA.IndexOf('{');
                 int endIndex = respostaIA.LastIndexOf('}');
-                
+
                 if (startIndex >= 0 && endIndex > startIndex)
                 {
                     respostaIA = respostaIA.Substring(startIndex, endIndex - startIndex + 1);
                 }
-                
+
                 _logger.LogInformation($"JSON limpo (primeiros 500 caracteres): {respostaIA.Substring(0, Math.Min(500, respostaIA.Length))}");
 
-                // Parse do JSON retornado com opções mais flexíveis
                 JsonSerializerOptions options = new JsonSerializerOptions
                 {
                     AllowTrailingCommas = true,
                     ReadCommentHandling = JsonCommentHandling.Skip,
                     PropertyNameCaseInsensitive = true
                 };
-                
+
                 var atividadeGerada = JsonSerializer.Deserialize<JsonElement>(respostaIA, options);
-                
+
+                var explicacoes = new List<object>();
+                if (atividadeGerada.TryGetProperty("explicacoes", out var explicacoesJson) && explicacoesJson.ValueKind == JsonValueKind.Array)
+                {
+                    explicacoes = explicacoesJson.EnumerateArray().Select(e => (object)new
+                    {
+                        questao = e.TryGetProperty("questao", out var qProp) ? qProp.GetInt32() : 0,
+                        explicacao = e.TryGetProperty("explicacao", out var exProp) ? exProp.GetString() : ""
+                    }).ToList();
+                }
+
+                var random = new Random();
+
+                var gabaritoOriginal = new Dictionary<int, string>();
+                foreach (var g in atividadeGerada.GetProperty("gabarito").EnumerateArray())
+                {
+                    var questaoNumero = g.TryGetProperty("questao", out var questaoProp) && questaoProp.ValueKind == JsonValueKind.Number
+                        ? questaoProp.GetInt32()
+                        : 0;
+
+                    var resposta = g.TryGetProperty("respostaCorreta", out var respProp)
+                        ? respProp.GetString()
+                        : null;
+
+                    if (questaoNumero <= 0 || string.IsNullOrWhiteSpace(resposta))
+                    {
+                        continue;
+                    }
+
+                    gabaritoOriginal[questaoNumero] = resposta.Trim().ToUpperInvariant();
+                }
+
+                var questoesJson = atividadeGerada.GetProperty("questoes").EnumerateArray().ToList();
+                var questoesProcessadas = new List<object>();
+                var gabaritoProcessado = new List<object>();
+
+                for (int index = 0; index < questoesJson.Count; index++)
+                {
+                    var questaoJson = questoesJson[index];
+                    var numeroQuestao = index + 1;
+
+                    var alternativasOriginais = questaoJson.GetProperty("alternativas")
+                        .EnumerateArray()
+                        .Select((a, altIndex) =>
+                        {
+                            var fallbackLetra = ((char)('A' + altIndex)).ToString();
+                            var idOriginal = a.TryGetProperty("id", out var idProp)
+                                ? idProp.GetString()
+                                : null;
+
+                            return new
+                            {
+                                letra = string.IsNullOrWhiteSpace(idOriginal)
+                                    ? fallbackLetra
+                                    : idOriginal.Trim().ToUpperInvariant(),
+                                texto = a.TryGetProperty("texto", out var textoProp)
+                                    ? textoProp.GetString() ?? string.Empty
+                                    : string.Empty
+                            };
+                        })
+                        .ToList();
+
+                    if (alternativasOriginais.Count == 0)
+                    {
+                        continue;
+                    }
+
+                    var letrasDestino = Enumerable.Range(0, alternativasOriginais.Count)
+                        .Select(i => ((char)('A' + i)).ToString())
+                        .ToArray();
+
+                    var letraCorretaOriginal = gabaritoOriginal.TryGetValue(numeroQuestao, out var letraEncontrada)
+                        ? letraEncontrada
+                        : alternativasOriginais[0].letra;
+
+                    var ordemAleatoria = Enumerable.Range(0, alternativasOriginais.Count)
+                        .OrderBy(_ => random.Next())
+                        .ToList();
+
+                    var alternativasNormalizadas = new List<object>();
+                    var novaLetraCorreta = letrasDestino[0];
+
+                    for (int destino = 0; destino < ordemAleatoria.Count; destino++)
+                    {
+                        var indiceOriginal = ordemAleatoria[destino];
+                        var alternativa = alternativasOriginais[indiceOriginal];
+                        var letraDestino = letrasDestino[destino];
+
+                        alternativasNormalizadas.Add(new
+                        {
+                            id = letraDestino,
+                            texto = alternativa.texto
+                        });
+
+                        if (string.Equals(alternativa.letra, letraCorretaOriginal, StringComparison.OrdinalIgnoreCase))
+                        {
+                            novaLetraCorreta = letraDestino;
+                        }
+                    }
+
+                    questoesProcessadas.Add(new
+                    {
+                        numero = numeroQuestao,
+                        enunciado = questaoJson.GetProperty("enunciado").GetString(),
+                        alternativas = alternativasNormalizadas.ToArray(),
+                        tipo = "MultiplaEscolha"
+                    });
+
+                    gabaritoProcessado.Add(new
+                    {
+                        questao = numeroQuestao,
+                        respostaCorreta = novaLetraCorreta
+                    });
+                }
+
                 var atividade = new
                 {
                     id = Guid.NewGuid().ToString(),
                     configuracao = request.Configuracao,
-                    questoes = atividadeGerada.GetProperty("questoes").EnumerateArray().Select((q, index) => new
-                    {
-                        numero = index + 1,
-                        enunciado = q.GetProperty("enunciado").GetString(),
-                        alternativas = q.GetProperty("alternativas").EnumerateArray().Select(a => new
-                        {
-                            id = a.GetProperty("id").GetString(),
-                            texto = a.GetProperty("texto").GetString()
-                        }).ToArray(),
-                        tipo = "MultiplaEscolha"
-                    }).ToArray(),
-                    gabarito = atividadeGerada.GetProperty("gabarito").EnumerateArray().Select(g => new
-                    {
-                        questao = g.GetProperty("questao").GetInt32(),
-                        respostaCorreta = g.GetProperty("respostaCorreta").GetString()
-                    }).ToArray(),
-                    explicacoes = atividadeGerada.GetProperty("explicacoes").EnumerateArray().Select(e => new
-                    {
-                        questao = e.GetProperty("questao").GetInt32(),
-                        explicacao = e.GetProperty("explicacao").GetString()
-                    }).ToArray(),
-                    criadaEm = DateTime.Now
+                    questoes = questoesProcessadas.ToArray(),
+                    gabarito = gabaritoProcessado.ToArray(),
+                    explicacoes,
+                    criadaEm = DateTime.UtcNow
                 };
 
-                _logger.LogInformation($"Atividade IA gerada com sucesso com {request.Configuracao?.Quantidade} questões");
+                var tempoTotal = DateTime.UtcNow - inicio;
+                _logger.LogInformation("Atividade IA gerada com sucesso com {Quantidade} questões em {TempoMs}ms", quantidade, (int)tempoTotal.TotalMilliseconds);
+                await Report(100, "Atividade pronta!");
 
-                return Ok(atividade);
+                return atividade;
+            }
+            catch (TaskCanceledException ex)
+            {
+                _logger.LogWarning(ex, "Timeout/cancelamento na geração IA.");
+                await Report(95, "Timeout na IA ao gerar atividade.");
+                throw new TimeoutException("Geração de atividade IA foi cancelada/timeout.", ex);
+            }
+            catch (TimeoutException ex)
+            {
+                _logger.LogWarning(ex, "Timeout na geração IA.");
+                await Report(95, "Timeout na IA ao gerar atividade.");
+                throw;
             }
             catch (JsonException ex)
             {
                 _logger.LogError(ex, $"Erro ao parsear JSON da resposta do DeepSeek. JSON recebido: {respostaIA}");
-                return StatusCode(500, new 
-                { 
-                    message = "Erro ao processar resposta da IA", 
-                    error = ex.Message,
-                    jsonRecebido = respostaIA?.Length > 1000 ? respostaIA.Substring(0, 1000) + "..." : respostaIA
-                });
+                await Report(95, "Resposta inválida da IA ao gerar atividade.");
+                throw;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Erro ao gerar atividade IA");
-                return StatusCode(500, new { message = "Erro ao gerar atividade", error = ex.Message });
+                _logger.LogError(ex, "Erro inesperado ao gerar atividade IA");
+                await Report(95, "Erro inesperado na geração IA.");
+                throw;
             }
         }
+        
 
         // POST: api/AtividadeIA/corrigir
         [HttpPost("corrigir")]
@@ -315,6 +578,17 @@ IMPORTANTE: Retorne APENAS o JSON, sem texto adicional antes ou depois.";
             try
             {
                 _logger.LogInformation($"Corrigindo atividade para usuário {request.UserId}");
+
+                if (request.UserId <= 0)
+                {
+                    return BadRequest(new { message = "Usuário inválido para correção da atividade." });
+                }
+
+                var usuarioExiste = await _context.Users.AnyAsync(u => u.Id == request.UserId);
+                if (!usuarioExiste)
+                {
+                    return BadRequest(new { message = "Usuário não encontrado para salvar a correção." });
+                }
 
                 // Calcular acertos e erros
                 int acertos = 0;
@@ -365,31 +639,46 @@ IMPORTANTE: Retorne APENAS o JSON, sem texto adicional antes ou depois.";
                 
                 _logger.LogInformation($"📊 CÁLCULO DE NOTA: {acertos} acertos / {totalQuestoes} questões = {nota:F2} (percentual: {percentual:F2}%)");
 
+                var atividadeFkId = 0;
+                if (int.TryParse(request.AtividadeId, out var atividadeIdParseado) && atividadeIdParseado > 0)
+                {
+                    var atividadeExiste = await _context.Atividades.AnyAsync(a => a.Id == atividadeIdParseado);
+                    if (atividadeExiste)
+                    {
+                        atividadeFkId = atividadeIdParseado;
+                    }
+                }
+
+                if (atividadeFkId <= 0)
+                {
+                    atividadeFkId = await ObterOuCriarAtividadeTecnicaIaAsync(request.Configuracao, totalQuestoes);
+                }
+
                 // Salvar no banco de dados
                 var execucao = new AtividadeExecucoes
                 {
                     UserId = request.UserId,
-                    AtividadeId = 0, // Atividade gerada por IA não tem ID específico
+                    AtividadeId = atividadeFkId,
                     TotalQuestoes = totalQuestoes,
                     GeradaPorIA = true,
                     Status = "Concluída",
-                    DataInicio = DateTime.Now.AddMinutes(-15), // Estimativa
-                    DataFim = DateTime.Now,
+                    DataInicio = DateTime.UtcNow.AddMinutes(-15), // Estimativa
+                    DataFim = DateTime.UtcNow,
                     Acertos = acertos,
                     Erros = erros,
                     Nota = nota,
                     TempoGastoSegundos = 900, // 15 minutos default
-                    Materia = request.Configuracao?.Materia,
-                    Segmento = request.Configuracao?.Segmento,
-                    Ano = request.Configuracao?.Ano,
-                    Conteudo = request.Configuracao?.Conteudo,
-                    Nivel = request.Configuracao?.Nivel,
-                    Tipo = request.Configuracao?.Tipo,
+                    Materia = LimitarTexto(request.Configuracao?.Materia, 100),
+                    Segmento = LimitarTexto(request.Configuracao?.Segmento, 50),
+                    Ano = LimitarTexto(request.Configuracao?.Ano, 50),
+                    Conteudo = LimitarTexto(request.Configuracao?.Conteudo, 500),
+                    Nivel = LimitarTexto(request.Configuracao?.Nivel, 50),
+                    Tipo = LimitarTexto(request.Configuracao?.Tipo, 50),
                     QuestoesJson = request.Questoes != null ? JsonSerializer.Serialize(request.Questoes) : null,
                     GabaritoJson = request.Gabarito != null ? JsonSerializer.Serialize(request.Gabarito) : null,
                     RespostasJson = request.Respostas != null ? JsonSerializer.Serialize(request.Respostas) : null,
-                    CriadoEm = DateTime.Now,
-                    AtualizadoEm = DateTime.Now
+                    CriadoEm = DateTime.UtcNow,
+                    AtualizadoEm = DateTime.UtcNow
                 };
 
                 _context.AtividadeExecucoes.Add(execucao);
@@ -416,6 +705,89 @@ IMPORTANTE: Retorne APENAS o JSON, sem texto adicional antes ou depois.";
                 _logger.LogError(ex, "Erro ao corrigir atividade");
                 return StatusCode(500, new { message = "Erro ao corrigir atividade", error = ex.Message });
             }
+        }
+
+        private static async Task GarantirDuracaoMinimaAsync(DateTime inicio, TimeSpan duracaoMinima)
+        {
+            var restante = duracaoMinima - (DateTime.UtcNow - inicio);
+            if (restante > TimeSpan.Zero)
+            {
+                await Task.Delay(restante);
+            }
+        }
+
+        private static string? LimitarTexto(string? valor, int maxLength)
+        {
+            if (string.IsNullOrWhiteSpace(valor))
+            {
+                return valor;
+            }
+
+            return valor.Length <= maxLength ? valor : valor[..maxLength];
+        }
+
+        private async Task<int> ObterOuCriarAtividadeTecnicaIaAsync(ConfiguracaoAtividadeDto? configuracao, int totalQuestoes)
+        {
+            var nomeMateria = LimitarTexto(configuracao?.Materia, 100);
+
+            int? materiaId = null;
+            if (!string.IsNullOrWhiteSpace(nomeMateria))
+            {
+                var nomeMateriaLower = nomeMateria.ToLower();
+                materiaId = await _context.materias
+                    .Where(m => m.Nome.ToLower() == nomeMateriaLower)
+                    .Select(m => (int?)m.Id)
+                    .FirstOrDefaultAsync();
+            }
+
+            if (!materiaId.HasValue)
+            {
+                materiaId = await _context.materias
+                    .Select(m => (int?)m.Id)
+                    .FirstOrDefaultAsync();
+            }
+
+            if (!materiaId.HasValue)
+            {
+                var novaMateria = new Materias
+                {
+                    Nome = nomeMateria ?? "Geral",
+                    area_id = 0
+                };
+
+                _context.materias.Add(novaMateria);
+                await _context.SaveChangesAsync();
+                materiaId = novaMateria.Id;
+            }
+
+            var nomeAtividadeTecnica = "Atividade IA - Execução";
+            var tipoAtividade = LimitarTexto(configuracao?.Tipo, 50) ?? "Quiz";
+            var nivelAtividade = LimitarTexto(configuracao?.Nivel, 50) ?? "Médio";
+
+            var atividadeTecnica = await _context.Atividades
+                .Where(a => a.MateriaId == materiaId.Value && a.Nome == nomeAtividadeTecnica && a.Tipo == tipoAtividade)
+                .FirstOrDefaultAsync();
+
+            if (atividadeTecnica == null)
+            {
+                atividadeTecnica = new Atividades
+                {
+                    Nome = nomeAtividadeTecnica,
+                    Descricao = "Atividade técnica criada automaticamente para persistir execuções geradas por IA.",
+                    MateriaId = materiaId.Value,
+                    Tipo = tipoAtividade,
+                    NivelDificuldade = nivelAtividade,
+                    TotalQuestoes = totalQuestoes > 0 ? totalQuestoes : Math.Max(1, configuracao?.Quantidade ?? 10),
+                    Ativo = true,
+                    CriadoEm = DateTime.UtcNow,
+                    AtualizadoEm = DateTime.UtcNow
+                };
+
+                _context.Atividades.Add(atividadeTecnica);
+                await _context.SaveChangesAsync();
+            }
+
+            return atividadeTecnica.Id;
         }
     }
 
@@ -448,6 +820,7 @@ IMPORTANTE: Retorne APENAS o JSON, sem texto adicional antes ou depois.";
     {
         public string? Materia { get; set; }
         public string? Segmento { get; set; }
+        public string? Concurso { get; set; }
         public string? Ano { get; set; }
         public string? Conteudo { get; set; }
         public string? Nivel { get; set; }

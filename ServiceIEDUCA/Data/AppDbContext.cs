@@ -24,6 +24,7 @@ namespace ServiceIEDUCA.Data
         public DbSet<RedacaoErrosGramaticais> RedacaoErrosGramaticais { get; set; }
         public DbSet<RedacaoFeedbacks> RedacaoFeedbacks { get; set; }
         public DbSet<RedacaoPropostaIntervencao> RedacaoPropostaIntervencao { get; set; }
+        public DbSet<RedacaoCustos> RedacaoCustos { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -34,7 +35,7 @@ namespace ServiceIEDUCA.Data
                 entity.HasKey(e => e.Id);
                 entity.Property(e => e.Nome).IsRequired().HasMaxLength(100);
                 entity.Property(e => e.Senha).IsRequired().HasMaxLength(255);
-                entity.Property(e => e.DataCriacao).HasDefaultValueSql("GETDATE()");
+                entity.Property(e => e.DataCriacao).HasDefaultValueSql("CURRENT_TIMESTAMP");
                 
                 // Relacionamento com Escola
                 entity.HasOne<Escola>()
@@ -51,7 +52,7 @@ namespace ServiceIEDUCA.Data
                 entity.Property(e => e.Nome).IsRequired().HasMaxLength(200);
                 entity.Property(e => e.Tipo).IsRequired().HasMaxLength(50);
                 entity.Property(e => e.NivelDificuldade).IsRequired().HasMaxLength(50);
-                entity.Property(e => e.CriadoEm).HasDefaultValueSql("GETDATE()");
+                entity.Property(e => e.CriadoEm).HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                 // Relacionamento com Materias
                 entity.HasOne(e => e.Materia)
@@ -67,7 +68,7 @@ namespace ServiceIEDUCA.Data
             modelBuilder.Entity<AtividadeExecucoes>(entity =>
             {
                 entity.HasKey(e => e.Id);
-                entity.Property(e => e.CriadoEm).HasDefaultValueSql("GETDATE()");
+                entity.Property(e => e.CriadoEm).HasDefaultValueSql("CURRENT_TIMESTAMP");
                 entity.Property(e => e.Status).HasMaxLength(20).HasDefaultValue("Em Andamento");
 
                 // Relacionamentos comentados - não necessários pois usamos Select() direto
@@ -104,7 +105,7 @@ namespace ServiceIEDUCA.Data
             {
                 entity.HasKey(e => e.Id);
                 entity.Property(e => e.Resultado).IsRequired().HasMaxLength(10);
-                entity.Property(e => e.CriadoEm).HasDefaultValueSql("GETDATE()");
+                entity.Property(e => e.CriadoEm).HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                 // Relacionamento com AtividadeExecucoes
                 entity.HasOne(e => e.Execucao)
@@ -126,6 +127,32 @@ namespace ServiceIEDUCA.Data
             {
                 entity.Property(e => e.NotaTotal)
                     .HasColumnType("int");
+            });
+
+            modelBuilder.Entity<RedacaoCustos>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+
+                entity.Property(e => e.PromptCacheHitPricing)
+                    .HasColumnType("decimal(18,8)");
+
+                entity.Property(e => e.PromptCacheMissPricing)
+                    .HasColumnType("decimal(18,8)");
+
+                entity.Property(e => e.CustoOutPricing)
+                    .HasColumnType("decimal(18,8)");
+
+                entity.Property(e => e.Total)
+                    .HasColumnType("decimal(18,8)");
+
+                entity.HasOne(e => e.Redacao)
+                    .WithMany()
+                    .HasForeignKey(e => e.FkRedacao)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasIndex(e => e.FkRedacao)
+                    .IsUnique()
+                    .HasDatabaseName("IX_RedacaoCustos_FkRedacao");
             });
         }
     }

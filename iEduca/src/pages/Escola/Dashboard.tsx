@@ -32,7 +32,7 @@ ChartJS.register(
   ArcElement
 );
 
-const API_URL = 'http://localhost:5000/api';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 interface Usuario extends User {
   id: number;
@@ -86,13 +86,18 @@ export default function EscolaDashboard() {
   const [nome, setNome] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [telefone, setTelefone] = useState('');
   const [role, setRole] = useState('Aluno');
   
   // Edit user modal
   const [editingUser, setEditingUser] = useState<Usuario | null>(null);
-  const [showResetPassword, setShowResetPassword] = useState(false);
-  const [newPassword, setNewPassword] = useState('');
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editNome, setEditNome] = useState('');
+  const [editEmail, setEditEmail] = useState('');
+  const [editTelefone, setEditTelefone] = useState('');
+  const [editPassword, setEditPassword] = useState('');
+  const [editShowPassword, setEditShowPassword] = useState(false);
   
   const navigate = useNavigate();
 
@@ -184,15 +189,29 @@ export default function EscolaDashboard() {
   };
 
   const handleTelefoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let value = e.target.value.replace(/\D/g, '');
-    if (value.length <= 11) {
-      if (value.length <= 10) {
-        value = value.replace(/^(\d{2})(\d{4})(\d{0,4}).*/, '($1) $2-$3');
-      } else {
-        value = value.replace(/^(\d{2})(\d{5})(\d{0,4}).*/, '($1) $2-$3');
-      }
-      setTelefone(value);
+    const digits = e.target.value.replace(/\D/g, '');
+
+    // Allow clearing the field
+    if (digits.length === 0) {
+      setTelefone('');
+      return;
     }
+
+    // Format progressively and avoid trailing '-' when group is empty
+    let formatted = '';
+    if (digits.length <= 2) {
+      formatted = `(${digits}`;
+    } else if (digits.length <= 6) {
+      formatted = `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+    } else if (digits.length <= 10) {
+      // landline / 10-digit format: (DD) XXXX-XXXX
+      formatted = `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+    } else {
+      // mobile 11-digit format: (DD) XXXXX-XXXX
+      formatted = `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7, 11)}`;
+    }
+
+    setTelefone(formatted);
   };
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
@@ -230,29 +249,87 @@ export default function EscolaDashboard() {
     }
   };
 
-  const handleResetPassword = async () => {
-    if (!editingUser || newPassword.length < 6) {
-      setError('Senha deve ter no mínimo 6 caracteres');
+  const handleEditTelefoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const digits = e.target.value.replace(/\D/g, '');
+
+    if (digits.length === 0) {
+      setEditTelefone('');
+      return;
+    }
+
+    let formatted = '';
+    if (digits.length <= 2) {
+      formatted = `(${digits}`;
+    } else if (digits.length <= 6) {
+      formatted = `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+    } else if (digits.length <= 10) {
+      formatted = `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+    } else {
+      formatted = `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7, 11)}`;
+    }
+
+    setEditTelefone(formatted);
+  };
+
+  const handleUpdateUser = async () => {
+    if (!editingUser) {
+      setError('Nenhum usuário selecionado');
+      return;
+    }
+
+    if (!editNome.trim() || !editEmail.trim() || !editTelefone.trim()) {
+      setError('Nome, email e telefone são obrigatórios');
+      return;
+    }
+
+    // Validar senha apenas se foi fornecida
+    if (editPassword && editPassword.length < 6) {
+      setError('Se informada, a senha deve ter no mínimo 6 caracteres');
       return;
     }
 
     try {
       setLoading(true);
-      const response = await fetch(`${API_URL}/User/${editingUser.id}/reset-password`, {
+      
+      // Montar objeto apenas com os campos necessários
+      const updateData: any = {
+        nome: editNome,
+        email: editEmail,
+        telefone: editTelefone,
+        role: editingUser.role,
+        ativo: editingUser.ativo,
+        idEscola: editingUser.idEscola
+      };
+      
+      // Só incluir senha se foi preenchida
+      if (editPassword && editPassword.trim().length > 0) {
+        updateData.senha = editPassword;
+      }
+      
+      const response = await fetch(`${API_URL}/User/${editingUser.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ novaSenha: newPassword }),
+        body: JSON.stringify(updateData),
       });
 
-      if (!response.ok) throw new Error('Erro ao resetar senha');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        throw new Error(errorData?.message || 'Erro ao atualizar usuário');
+      }
 
-      setSuccess('Senha resetada com sucesso!');
-      setShowResetPassword(false);
+      setSuccess('Usuário atualizado com sucesso!');
+      setShowEditModal(false);
       setEditingUser(null);
-      setNewPassword('');
+      setEditNome('');
+      setEditEmail('');
+      setEditTelefone('');
+      setEditPassword('');
+      setEditShowPassword(false);
+      
+      if (escola) await carregarUsuarios(escola.id);
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
-      setError('Erro ao resetar senha');
+      setError(err instanceof Error ? err.message : 'Erro ao atualizar usuário');
     } finally {
       setLoading(false);
     }
@@ -565,12 +642,17 @@ export default function EscolaDashboard() {
                     <button
                       onClick={() => {
                         setEditingUser(user);
-                        setShowResetPassword(true);
+                        setEditNome(user.nome);
+                        setEditEmail(user.email);
+                        setEditTelefone(user.telefone || '');
+                        setEditPassword('');
+                        setEditShowPassword(false);
+                        setShowEditModal(true);
                       }}
                       className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-all"
-                      title="Resetar senha"
+                      title="Editar usuário"
                     >
-                      🔑
+                      ✏️
                     </button>
                     <button
                       onClick={() => handleDeleteUser(user.id)}
@@ -930,19 +1012,41 @@ export default function EscolaDashboard() {
                   <label className={`block mb-2 font-medium text-sm ${
                     darkMode ? 'text-slate-400' : 'text-slate-700'
                   }`}>Senha</label>
-                  <input
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    placeholder="••••••••"
-                    minLength={6}
-                    className={`w-full px-4 py-3.5 border-2 rounded-xl transition-all focus:outline-none ${
-                      darkMode
-                        ? 'bg-slate-700 border-slate-600 text-slate-100 focus:border-indigo-500'
-                        : 'bg-white border-slate-300 text-slate-900 focus:border-indigo-500'
-                    }`}
-                  />
+                  <div className="relative">
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                      placeholder="••••••••"
+                      minLength={6}
+                      className={`w-full pr-12 px-4 py-3.5 border-2 rounded-xl transition-all focus:outline-none ${
+                        darkMode
+                          ? 'bg-slate-700 border-slate-600 text-slate-100 focus:border-indigo-500'
+                          : 'bg-white border-slate-300 text-slate-900 focus:border-indigo-500'
+                      }`}
+                    />
+
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                      className={`absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors ${
+                        darkMode ? 'text-slate-200' : 'text-slate-600'
+                      }`}
+                    >
+                      {showPassword ? (
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                        </svg>
+                      ) : (
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                        </svg>
+                      )}
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -1140,36 +1244,125 @@ export default function EscolaDashboard() {
         )}
       </div>
 
-      {/* Modal de Reset de Senha */}
-      {showResetPassword && editingUser && (
+      {/* Modal de Editar Usuário */}
+      {showEditModal && editingUser && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className={`rounded-3xl p-8 max-w-md w-full shadow-2xl transition-colors ${
+          <div className={`rounded-3xl p-8 max-w-lg w-full shadow-2xl transition-colors ${
             darkMode ? 'bg-slate-800' : 'bg-white'
           }`}>
             <h3 className={`text-2xl font-bold mb-4 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-              Resetar Senha
+              Editar Usuário
             </h3>
-            <p className={`mb-6 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-              Resetar senha para: <strong>{editingUser.nome}</strong>
+            <p className={`mb-6 text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+              Editando: <strong>{editingUser.nome}</strong> ({editingUser.role})
             </p>
-            <input
-              type="password"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              placeholder="Nova senha (mín. 6 caracteres)"
-              minLength={6}
-              className={`w-full px-4 py-3.5 border-2 rounded-xl mb-4 transition-all focus:outline-none ${
-                darkMode
-                  ? 'bg-slate-700 border-slate-600 text-slate-100 focus:border-indigo-500'
-                  : 'bg-white border-slate-300 text-slate-900 focus:border-indigo-500'
-              }`}
-            />
-            <div className="flex gap-3">
+            
+            <div className="space-y-4">
+              <div>
+                <label className={`block mb-2 font-medium text-sm ${darkMode ? 'text-slate-400' : 'text-slate-700'}`}>
+                  Nome Completo
+                </label>
+                <input
+                  type="text"
+                  value={editNome}
+                  onChange={(e) => setEditNome(e.target.value)}
+                  required
+                  placeholder="Nome do usuário"
+                  className={`w-full px-4 py-3.5 border-2 rounded-xl transition-all focus:outline-none ${
+                    darkMode
+                      ? 'bg-slate-700 border-slate-600 text-slate-100 focus:border-indigo-500'
+                      : 'bg-white border-slate-300 text-slate-900 focus:border-indigo-500'
+                  }`}
+                />
+              </div>
+
+              <div>
+                <label className={`block mb-2 font-medium text-sm ${darkMode ? 'text-slate-400' : 'text-slate-700'}`}>
+                  Email
+                </label>
+                <input
+                  type="email"
+                  value={editEmail}
+                  onChange={(e) => setEditEmail(e.target.value)}
+                  required
+                  placeholder="email@exemplo.com"
+                  className={`w-full px-4 py-3.5 border-2 rounded-xl transition-all focus:outline-none ${
+                    darkMode
+                      ? 'bg-slate-700 border-slate-600 text-slate-100 focus:border-indigo-500'
+                      : 'bg-white border-slate-300 text-slate-900 focus:border-indigo-500'
+                  }`}
+                />
+              </div>
+
+              <div>
+                <label className={`block mb-2 font-medium text-sm ${darkMode ? 'text-slate-400' : 'text-slate-700'}`}>
+                  Telefone
+                </label>
+                <input
+                  type="tel"
+                  value={editTelefone}
+                  onChange={handleEditTelefoneChange}
+                  required
+                  placeholder="(00) 00000-0000"
+                  maxLength={15}
+                  className={`w-full px-4 py-3.5 border-2 rounded-xl transition-all focus:outline-none ${
+                    darkMode
+                      ? 'bg-slate-700 border-slate-600 text-slate-100 focus:border-indigo-500'
+                      : 'bg-white border-slate-300 text-slate-900 focus:border-indigo-500'
+                  }`}
+                />
+              </div>
+
+              <div>
+                <label className={`block mb-2 font-medium text-sm ${darkMode ? 'text-slate-400' : 'text-slate-700'}`}>
+                  Nova Senha (opcional)
+                </label>
+                <div className="relative">
+                  <input
+                    type={editShowPassword ? 'text' : 'password'}
+                    value={editPassword}
+                    onChange={(e) => setEditPassword(e.target.value)}
+                    placeholder="Digite apenas se quiser alterar a senha"
+                    minLength={6}
+                    className={`w-full pr-12 px-4 py-3.5 border-2 rounded-xl transition-all focus:outline-none ${
+                      darkMode
+                        ? 'bg-slate-700 border-slate-600 text-slate-100 focus:border-indigo-500'
+                        : 'bg-white border-slate-300 text-slate-900 focus:border-indigo-500'
+                    }`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setEditShowPassword(!editShowPassword)}
+                    aria-label={editShowPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                    className={`absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors ${
+                      darkMode ? 'text-slate-200' : 'text-slate-600'
+                    }`}
+                  >
+                    {editShowPassword ? (
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                      </svg>
+                    ) : (
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6">
               <button
                 onClick={() => {
-                  setShowResetPassword(false);
+                  setShowEditModal(false);
                   setEditingUser(null);
-                  setNewPassword('');
+                  setEditNome('');
+                  setEditEmail('');
+                  setEditTelefone('');
+                  setEditPassword('');
+                  setEditShowPassword(false);
                 }}
                 className={`flex-1 py-3 rounded-xl font-medium transition-all ${
                   darkMode
@@ -1180,11 +1373,11 @@ export default function EscolaDashboard() {
                 Cancelar
               </button>
               <button
-                onClick={handleResetPassword}
-                disabled={loading || newPassword.length < 6}
+                onClick={handleUpdateUser}
+                disabled={loading || !editNome.trim() || !editEmail.trim() || !editTelefone.trim() || (editPassword.length > 0 && editPassword.length < 6)}
                 className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {loading ? 'Resetando...' : 'Confirmar'}
+                {loading ? 'Atualizando...' : 'Salvar Alterações'}
               </button>
             </div>
           </div>

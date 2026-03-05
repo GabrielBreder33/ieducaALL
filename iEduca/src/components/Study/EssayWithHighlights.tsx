@@ -32,7 +32,6 @@ export default function EssayWithHighlights({ content, errors }: EssayWithHighli
       return <span className="text-slate-200">{content}</span>;
     }
 
-    // Normalizar erros para garantir compatibilidade
     const normalizedErrors = errors.map(error => ({
       start: error.start ?? error.posicaoInicio,
       end: error.end ?? error.posicaoFim,

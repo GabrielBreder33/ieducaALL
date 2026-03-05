@@ -39,12 +39,12 @@ namespace ServiceIEDUCA.Controllers
                 {
                     UserId = dto.UserId,
                     AtividadeId = dto.AtividadeId,
-                    DataInicio = DateTime.Now,
+                    DataInicio = DateTime.UtcNow,
                     TotalQuestoes = dto.TotalQuestoes,
                     Acertos = 0,
                     Erros = 0,
                     Status = "Em Andamento",
-                    CriadoEm = DateTime.Now
+                    CriadoEm = DateTime.UtcNow
                 };
 
                 _context.AtividadeExecucoes.Add(execucao);
@@ -95,7 +95,7 @@ namespace ServiceIEDUCA.Controllers
                     return BadRequest("Esta atividade já foi finalizada");
 
                 // Atualizar dados da execução
-                execucao.DataFim = DateTime.Now;
+                execucao.DataFim = DateTime.UtcNow;
                 execucao.Acertos = dto.Acertos;
                 execucao.Erros = dto.Erros;
                 execucao.Nota = dto.Nota;
@@ -116,7 +116,7 @@ namespace ServiceIEDUCA.Controllers
                             RespostaCorreta = questao.RespostaCorreta,
                             TempoGastoSegundos = questao.TempoGastoSegundos,
                             TopicoEspecifico = questao.TopicoEspecifico,
-                            CriadoEm = DateTime.Now
+                            CriadoEm = DateTime.UtcNow
                         };
 
                         _context.AtividadeQuestaoResultados.Add(questaoResultado);
@@ -298,12 +298,30 @@ namespace ServiceIEDUCA.Controllers
         {
             try
             {
+                // Buscar execuções de atividades/exercícios
                 var execucoes = await _context.AtividadeExecucoes
                     .Where(e => e.UserId == userId && e.Status == "Concluída")
                     .OrderBy(e => e.DataFim)
                     .ToListAsync();
 
-                if (!execucoes.Any())
+                // Buscar redações corrigidas (case-insensitive)
+                var todasRedacoes = await _context.RedacaoCorrecoes
+                    .Where(r => r.UserId == userId)
+                    .ToListAsync();
+                
+                _logger.LogInformation($"🔍 Total de redações do usuário {userId}: {todasRedacoes.Count}");
+                foreach (var r in todasRedacoes)
+                {
+                    _logger.LogInformation($"   Redação ID {r.Id}: Status='{r.Status}', Nota={r.NotaTotal}");
+                }
+
+                var redacoes = todasRedacoes
+                    .Where(r => r.Status != null && (r.Status == "Concluída" || r.Status.ToLower() == "concluida"))
+                    .ToList();
+                
+                _logger.LogInformation($"📝 Redações concluídas: {redacoes.Count}");
+
+                if (!execucoes.Any() && !redacoes.Any())
                 {
                     return Ok(new
                     {
@@ -311,6 +329,8 @@ namespace ServiceIEDUCA.Controllers
                         acertos = 0,
                         erros = 0,
                         mediaNotas = 0.0,
+                        mediaNotasAtividades = 0.0,
+                        mediaNotasRedacoes = 0.0,
                         tempoTotalSegundos = 0,
                         ultimasAtividades = new List<object>()
                     });
@@ -318,9 +338,23 @@ namespace ServiceIEDUCA.Controllers
 
                 var totalAcertos = execucoes.Sum(e => e.Acertos);
                 var totalErros = execucoes.Sum(e => e.Erros);
-                var mediaNotas = execucoes.Where(e => e.Nota.HasValue).Any() 
+                
+                // Média de notas de atividades (escala 0-10)
+                var mediaNotasAtividades = execucoes.Where(e => e.Nota.HasValue).Any() 
                     ? (double)execucoes.Where(e => e.Nota.HasValue).Average(e => e.Nota ?? 0) 
                     : 0.0;
+
+                // Média de notas de redações (escala 0-1000)
+                var mediaNotasRedacoes = redacoes.Any()
+                    ? (double)redacoes.Average(r => r.NotaTotal)
+                    : 0.0;
+
+                // Média geral (normalizando todas as notas para 0-10)
+                var todasNotas = new List<double>();
+                todasNotas.AddRange(execucoes.Where(e => e.Nota.HasValue).Select(e => (double)(e.Nota ?? 0)));
+                todasNotas.AddRange(redacoes.Select(r => (double)r.NotaTotal / 100)); // Converte 0-1000 para 0-10
+                var mediaNotas = todasNotas.Any() ? todasNotas.Average() : 0.0;
+
                 var tempoTotal = execucoes.Where(e => e.TempoGastoSegundos.HasValue)
                     .Sum(e => e.TempoGastoSegundos ?? 0);
 
@@ -338,13 +372,17 @@ namespace ServiceIEDUCA.Controllers
 
                 var estatisticas = new
                 {
-                    totalAtividades = execucoes.Count,
+                    totalAtividades = execucoes.Count + redacoes.Count,
                     acertos = totalAcertos,
                     erros = totalErros,
                     mediaNotas = Math.Round(mediaNotas, 1),
+                    mediaNotasAtividades = Math.Round(mediaNotasAtividades, 1),
+                    mediaNotasRedacoes = Math.Round(mediaNotasRedacoes, 0),
                     tempoTotalSegundos = tempoTotal,
                     ultimasAtividades = ultimasAtividades
                 };
+
+                _logger.LogInformation($"📊 Estatísticas do usuário {userId}: {execucoes.Count} atividades, {redacoes.Count} redações, média atividades: {mediaNotasAtividades:F1}, média redações: {mediaNotasRedacoes:F0}");
 
                 return Ok(estatisticas);
             }
@@ -353,6 +391,31 @@ namespace ServiceIEDUCA.Controllers
                 _logger.LogError(ex, "Erro ao buscar estatísticas do usuário {UserId}", userId);
                 return StatusCode(500, "Erro interno do servidor");
             }
+        }
+
+        // GET: api/AtividadeExecucoes/debug/redacoes/{userId}
+        // Endpoint temporário para debug
+        [HttpGet("debug/redacoes/{userId}")]
+        public async Task<ActionResult> DebugRedacoes(int userId)
+        {
+            var redacoes = await _context.RedacaoCorrecoes
+                .Where(r => r.UserId == userId)
+                .Select(r => new
+                {
+                    id = r.Id,
+                    tema = r.Tema,
+                    status = r.Status,
+                    notaTotal = r.NotaTotal,
+                    criadoEm = r.CriadoEm,
+                    atualizadoEm = r.AtualizadoEm
+                })
+                .ToListAsync();
+
+            return Ok(new
+            {
+                total = redacoes.Count,
+                redacoes = redacoes
+            });
         }
 
         // GET: api/AtividadeExecucoes/{id}/questoes
@@ -447,7 +510,7 @@ namespace ServiceIEDUCA.Controllers
                 var mediaAcertos = totalQuestoes > 0 ? Math.Round((totalAcertos / (double)totalQuestoes) * 100, 1) : 0;
 
                 // Estatísticas por mês (últimos 6 meses)
-                var dataLimite = DateTime.Now.AddMonths(-6);
+                var dataLimite = DateTime.UtcNow.AddMonths(-6);
                 var execucoesPorMes = execucoes
                     .Where(e => e.DataFim.HasValue && e.DataFim.Value >= dataLimite)
                     .GroupBy(e => new { Ano = e.DataFim!.Value.Year, Mes = e.DataFim!.Value.Month })
@@ -468,7 +531,7 @@ namespace ServiceIEDUCA.Controllers
                 
                 for (int i = 0; i < 6; i++)
                 {
-                    var data = DateTime.Now.AddMonths(-5 + i);
+                    var data = DateTime.UtcNow.AddMonths(-5 + i);
                     var estatistica = execucoesPorMes.FirstOrDefault(e => e.Ano == data.Year && e.Mes == data.Month);
                     atividadesPorMes[i] = estatistica?.Quantidade ?? 0;
                     horasPorMes[i] = estatistica?.Horas ?? 0;

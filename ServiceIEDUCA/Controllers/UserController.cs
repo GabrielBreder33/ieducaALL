@@ -80,6 +80,17 @@ namespace ServiceIEDUCA.Controllers
                 if (!ModelState.IsValid)
                     return BadRequest(ModelState);
 
+                // Validação adicional: senha é obrigatória ao criar usuário
+                if (string.IsNullOrWhiteSpace(userCreateDto.Senha))
+                {
+                    return BadRequest(new { message = "Senha é obrigatória ao criar um novo usuário" });
+                }
+
+                if (userCreateDto.Senha.Length < 6)
+                {
+                    return BadRequest(new { message = "Senha deve ter no mínimo 6 caracteres" });
+                }
+
                 _logger.LogInformation("Recebendo cadastro de usuário: {@UserCreateDto}", new
                 {
                     userCreateDto.Nome,
@@ -98,6 +109,16 @@ namespace ServiceIEDUCA.Controllers
                 });
 
                 return CreatedAtAction(nameof(GetById), new { id = createdUser.Id }, createdUser);
+            }
+            catch (InvalidOperationException ex)
+            {
+                _logger.LogWarning(
+                    "Cadastro rejeitado - {Reason} | Email: {Email} | Telefone: {Telefone}",
+                    ex.Message,
+                    userCreateDto.Email,
+                    userCreateDto.Telefone
+                );
+                return Conflict(new { message = ex.Message });
             }
             catch (Exception ex)
             {
@@ -129,6 +150,12 @@ namespace ServiceIEDUCA.Controllers
                     return BadRequest(ModelState);
                 }
 
+                // Validação: se senha foi fornecida, deve ter no mínimo 6 caracteres
+                if (!string.IsNullOrWhiteSpace(userCreateDto.Senha) && userCreateDto.Senha.Length < 6)
+                {
+                    return BadRequest(new { message = "Se informada, a senha deve ter no mínimo 6 caracteres" });
+                }
+
                 var updatedUser = await _userService.UpdateUserAsync(id, userCreateDto);
                 if (updatedUser == null)
                 {
@@ -147,9 +174,86 @@ namespace ServiceIEDUCA.Controllers
 
                 return Ok(updatedUser);
             }
+            catch (InvalidOperationException ex)
+            {
+                _logger.LogWarning(
+                    "Atualização rejeitada - {Reason} | Id: {Id} | Email: {Email} | Telefone: {Telefone}",
+                    ex.Message,
+                    id,
+                    userCreateDto.Email,
+                    userCreateDto.Telefone
+                );
+                return Conflict(new { message = ex.Message });
+            }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Erro ao atualizar usuário {Id}", id);
+                return StatusCode(500, "Erro interno do servidor");
+            }
+        }
+
+        // Endpoint específico para o usuário atualizar seu próprio perfil
+        // Requer senha atual obrigatória
+        [HttpPut("me/{id}")]
+        public async Task<ActionResult<UserDto>> UpdateSelfProfile(int id, [FromBody] UserSelfUpdateDto dto)
+        {
+            _logger.LogInformation(
+                "Usuário atualizando próprio perfil | Id: {Id}, Nome: {Nome}",
+                id,
+                dto.Nome
+            );
+
+            try
+            {
+                if (!ModelState.IsValid)
+                {
+                    _logger.LogWarning(
+                        "Atualização de perfil falhou por dados inválidos | Id: {Id}, Errors: {@Errors}",
+                        id,
+                        ModelState.Values.SelectMany(v => v.Errors)
+                                         .Select(e => e.ErrorMessage)
+                    );
+                    return BadRequest(ModelState);
+                }
+
+                var updatedUser = await _userService.UpdateSelfProfileAsync(id, dto);
+                if (updatedUser == null)
+                {
+                    _logger.LogWarning(
+                        "Atualização de perfil falhou - usuário não encontrado | Id: {Id}",
+                        id
+                    );
+                    return NotFound($"Usuário com ID {id} não encontrado");
+                }
+
+                _logger.LogInformation(
+                    "Perfil atualizado com sucesso | Id: {Id}, Nome: {Nome}",
+                    updatedUser.Id,
+                    updatedUser.Nome
+                );
+
+                return Ok(updatedUser);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                _logger.LogWarning(
+                    "Atualização de perfil rejeitada - senha incorreta | Id: {Id}",
+                    id
+                );
+                return Unauthorized(new { message = ex.Message });
+            }
+            catch (InvalidOperationException ex)
+            {
+                _logger.LogWarning(
+                    "Atualização de perfil rejeitada - {Reason} | Id: {Id}",
+                    ex.Message,
+                    id
+                );
+                return Conflict(new { message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Erro ao atualizar perfil do usuário {Id}", id);
                 return StatusCode(500, "Erro interno do servidor");
             }
         }

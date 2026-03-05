@@ -3,14 +3,19 @@ using ServiceIEDUCA.Data;
 using ServiceIEDUCA.Services;
 using Serilog;
 using Serilog.Context;
+using Serilog.Events;
 
 var builder = WebApplication.CreateBuilder(args);
 
 #region SERILOG
 Log.Logger = new LoggerConfiguration()
+    .MinimumLevel.Debug()
+    .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
+    .MinimumLevel.Override("System", LogEventLevel.Warning)
     .Enrich.FromLogContext()
     .Enrich.WithProperty("Application", "ServiceIEDUCA")
-    .WriteTo.Console()
+    .WriteTo.Console(
+        outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] [{Application}] [Req:{RequestId}] {SourceContext} {Message:lj}{NewLine}{Exception}")
     .CreateLogger();
 
 builder.Host.UseSerilog();
@@ -23,15 +28,17 @@ builder.Services.AddControllers()
     });
 
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IConhecimentoService, ConhecimentoService>();
-builder.Services.AddScoped<IRedacaoCorrecaoService, RedacaoCorrecaoService>();
-builder.Services.AddScoped<IDeepSeekService, DeepSeekService>();
+builder.Services.AddScoped<IRankingService, RankingService>();
 
 builder.Services.AddHttpClient<IRedacaoCorrecaoService, RedacaoCorrecaoService>();
-builder.Services.AddHttpClient<IDeepSeekService, DeepSeekService>();
+builder.Services.AddHttpClient<IDeepSeekService, DeepSeekService>(client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(180);
+});
 
 builder.Services.AddHostedService<RedacaoBackgroundService>();
 

@@ -7,6 +7,8 @@ interface ProgressData {
   notaTotal?: number;
 }
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+
 export const useSSEProgress = (correcaoId: number | null) => {
   const [progressData, setProgressData] = useState<ProgressData | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -31,7 +33,7 @@ export const useSSEProgress = (correcaoId: number | null) => {
         console.log(`🔄 [${new Date().toLocaleTimeString()}] Fazendo requisição...`);
         
         const response = await fetch(
-          `http://localhost:5000/api/RedacaoCorrecao/progresso-status/${correcaoId}?t=${timestamp}`, 
+          `${API_URL}/RedacaoCorrecao/progresso-status/${correcaoId}?t=${timestamp}`, 
           {
             method: 'GET',
             cache: 'no-store',
@@ -52,7 +54,6 @@ export const useSSEProgress = (correcaoId: number | null) => {
 
         if (!mountedRef.current) return;
 
-        // SEMPRE atualizar o estado, criar novo objeto a cada vez
         setProgressData({
           correcaoId: data.correcaoId || correcaoId,
           progresso: data.progresso || 0,
@@ -63,7 +64,6 @@ export const useSSEProgress = (correcaoId: number | null) => {
         setIsConnected(true);
         setError(null);
 
-        // Parar polling se concluído
         if (data.status === 'concluida' || data.status === 'erro') {
           console.log('✅ Status final alcançado:', data.status, '- Parando polling');
           if (intervalRef.current) {
@@ -80,10 +80,8 @@ export const useSSEProgress = (correcaoId: number | null) => {
       }
     };
 
-    // Fetch imediato
     fetchProgress();
 
-    // Polling a cada 1 segundo
     intervalRef.current = setInterval(fetchProgress, 1000);
 
     return () => {

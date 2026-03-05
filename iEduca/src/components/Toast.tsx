@@ -25,7 +25,6 @@ export default function Toast({ message, score, total, onClose, duration = 5000 
     <div className="fixed bottom-6 right-6 z-50 animate-slide-in-right">
       <div className="bg-slate-800 border border-slate-700 rounded-xl shadow-2xl p-6 max-w-md min-w-[320px]">
         <div className="flex items-start gap-4">
-          {/* Icon */}
           <div className={`flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center text-2xl ${
             isGoodScore 
               ? 'bg-emerald-500/20 text-emerald-400' 
@@ -36,7 +35,6 @@ export default function Toast({ message, score, total, onClose, duration = 5000 
             {isGoodScore ? '🎉' : isAverageScore ? '👍' : '📚'}
           </div>
 
-          {/* Content */}
           <div className="flex-1">
             <h3 className="text-lg font-bold text-slate-100 mb-1">
               {isGoodScore ? 'Excelente!' : isAverageScore ? 'Bom trabalho!' : 'Continue praticando!'}
@@ -45,7 +43,6 @@ export default function Toast({ message, score, total, onClose, duration = 5000 
               {message}
             </p>
 
-            {/* Score Display */}
             <div className="flex items-center gap-3">
               <div className="flex-1 bg-slate-700 rounded-full h-2 overflow-hidden">
                 <div 
@@ -75,7 +72,6 @@ export default function Toast({ message, score, total, onClose, duration = 5000 
             </p>
           </div>
 
-          {/* Close Button */}
           <button
             onClick={onClose}
             className="flex-shrink-0 text-slate-400 hover:text-slate-100 transition-colors"

@@ -7,7 +7,11 @@ interface CalendarDay {
   atividadesCount: number;
   atividades: {
     id: number;
+    tipo: string;
+    materia: string;
+    tema: string;
     nota: number;
+    notaOriginal?: number;
     status: string;
     hora: string;
   }[];
@@ -17,8 +21,17 @@ interface CalendarDay {
 
 interface CalendarProps {
   darkMode?: boolean;
-  userId?: number; // ID do usuário para visualizar o calendário
-  atividadesRealizadas?: Array<{ data: string; tipo: string; nota: number }>; // Atividades externas
+  userId?: number; 
+  atividadesRealizadas?: Array<{ 
+    data: string; 
+    tipo: string;
+    subtipo?: string;
+    materia?: string;
+    tema?: string;
+    nota: number;
+    notaOriginal?: number;
+    id?: number;
+  }>;  
 }
 
 export default function Calendar({ darkMode = true, userId, atividadesRealizadas }: CalendarProps) {
@@ -33,24 +46,24 @@ export default function Calendar({ darkMode = true, userId, atividadesRealizadas
 
   useEffect(() => {
     loadCalendarData();
-  }, [currentDate, userId, atividadesRealizadas]); // Adicionar atividadesRealizadas como dependência
-
+  }, [currentDate, userId, atividadesRealizadas]);  
   const loadCalendarData = async () => {
     try {
       let historicoParaUsar: any[] = [];
       
-      // Se atividadesRealizadas foi passado, usar ele
       if (atividadesRealizadas && atividadesRealizadas.length > 0) {
-        // Converter para formato esperado
         historicoParaUsar = atividadesRealizadas.map(a => ({
           dataInicio: a.data,
           dataFim: a.data,
           nota: a.nota,
+          notaOriginal: a.notaOriginal,
+          tipo: a.tipo || 'atividade',
+          materia: a.materia || 'Geral',
+          tema: a.tema || 'Sem tema',
           status: 'Concluída',
-          id: Math.random() // ID temporário
+          id: a.id || 0
         }));
       } else {
-        // Caso contrário, buscar da API (comportamento original)
         let userIdToUse = userId;
         if (!userIdToUse) {
           const user = authService.getCurrentUser();
@@ -58,24 +71,23 @@ export default function Calendar({ darkMode = true, userId, atividadesRealizadas
           userIdToUse = user.id;
         }
 
-        // Buscar histórico de atividades
-        historicoParaUsar = await atividadeService.getHistoricoUsuario(userIdToUse);
+        if (userIdToUse) {
+          historicoParaUsar = await atividadeService.getHistoricoUsuario(userIdToUse);
+        }
       }
       
-      // Gerar dias do calendário
       const year = currentDate.getFullYear();
       const month = currentDate.getMonth();
       const firstDay = new Date(year, month, 1);
       const lastDay = new Date(year, month + 1, 0);
       const daysInMonth = lastDay.getDate();
-      const startDayOfWeek = firstDay.getDay(); // 0 = Domingo
+      const startDayOfWeek = firstDay.getDay(); 
       
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
       const days: CalendarDay[] = [];
       
-      // Dias do mês anterior (para completar a primeira semana)
       const prevMonthLastDay = new Date(year, month, 0).getDate();
       for (let i = startDayOfWeek - 1; i >= 0; i--) {
         days.push({
@@ -87,12 +99,10 @@ export default function Calendar({ darkMode = true, userId, atividadesRealizadas
         });
       }
 
-      // Dias do mês atual
       for (let day = 1; day <= daysInMonth; day++) {
         const date = new Date(year, month, day);
         date.setHours(0, 0, 0, 0);
         
-        // Filtrar atividades deste dia
         const atividadesDoDia = historicoParaUsar.filter(atividade => {
           const atividadeDate = new Date(atividade.dataFim || atividade.dataInicio);
           atividadeDate.setHours(0, 0, 0, 0);
@@ -104,7 +114,11 @@ export default function Calendar({ darkMode = true, userId, atividadesRealizadas
           atividadesCount: atividadesDoDia.length,
           atividades: atividadesDoDia.map(a => ({
             id: a.id,
+            tipo: a.tipo || 'atividade',
+            materia: a.materia || 'Geral',
+            tema: a.tema || 'Sem tema',
             nota: a.nota || 0,
+            notaOriginal: a.notaOriginal,
             status: a.status,
             hora: new Date(a.dataFim || a.dataInicio).toLocaleTimeString('pt-BR', { 
               hour: '2-digit', 
@@ -116,8 +130,7 @@ export default function Calendar({ darkMode = true, userId, atividadesRealizadas
         });
       }
 
-      // Dias do próximo mês (para completar a última semana)
-      const remainingDays = 42 - days.length; // 6 semanas x 7 dias
+      const remainingDays = 42 - days.length;  
       for (let day = 1; day <= remainingDays; day++) {
         days.push({
           day,
@@ -164,7 +177,6 @@ export default function Calendar({ darkMode = true, userId, atividadesRealizadas
         : 'bg-slate-100 text-slate-600 hover:bg-slate-200';
     }
     
-    // Gradiente de cores baseado na quantidade de atividades
     if (atividadesCount === 1) {
       return darkMode
         ? 'bg-emerald-500/30 text-emerald-200 border-emerald-500/50 hover:bg-emerald-500/40'
@@ -193,19 +205,16 @@ export default function Calendar({ darkMode = true, userId, atividadesRealizadas
     let maxStreak = 0;
     let tempStreak = 0;
     
-    // Verificar se existe atividade HOJE
     const todayHasActivity = calendarDays.find(d => 
       d.day === currentDay && 
       d.isCurrentMonth && 
       d.atividadesCount > 0
     );
     
-    // Se hoje não tem atividade, sequência atual é 0
     if (!todayHasActivity) {
-      // Mas ainda calcula a melhor sequência de todos os tempos
       const sortedDays = [...calendarDays]
         .filter(d => d.isCurrentMonth)
-        .sort((a, b) => a.day - b.day); // Ordem crescente
+        .sort((a, b) => a.day - b.day);  
       
       for (const day of sortedDays) {
         if (day.atividadesCount > 0) {
@@ -219,21 +228,19 @@ export default function Calendar({ darkMode = true, userId, atividadesRealizadas
       return { currentStreak: 0, maxStreak };
     }
     
-    // Contar sequência atual (de hoje para trás)
     for (let i = currentDay; i >= 1; i--) {
       const dayData = calendarDays.find(d => d.day === i && d.isCurrentMonth);
       
       if (dayData && dayData.atividadesCount > 0) {
         currentStreak++;
       } else {
-        break; // Para quando encontrar um dia sem atividade
+        break;  
       }
     }
     
-    // Calcular melhor sequência de todos os tempos
     const sortedDays = [...calendarDays]
       .filter(d => d.isCurrentMonth)
-      .sort((a, b) => a.day - b.day); // Ordem crescente
+      .sort((a, b) => a.day - b.day);  
     
     for (const day of sortedDays) {
       if (day.atividadesCount > 0) {
@@ -255,7 +262,6 @@ export default function Calendar({ darkMode = true, userId, atividadesRealizadas
         ? 'bg-slate-800/50 border-slate-700/50' 
         : 'bg-white border-slate-200 shadow-lg'
     }`}>
-      {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <div>
           <h3 className={`text-xl font-bold ${
@@ -302,8 +308,6 @@ export default function Calendar({ darkMode = true, userId, atividadesRealizadas
           </button>
         </div>
       </div>
-
-      {/* Mês/Ano */}
       <div className={`text-center mb-4 text-lg font-bold ${
         darkMode ? 'text-slate-200' : 'text-slate-800'
       }`}>
@@ -316,7 +320,6 @@ export default function Calendar({ darkMode = true, userId, atividadesRealizadas
         </div>
       ) : (
         <>
-          {/* Dias da semana */}
           <div className="grid grid-cols-7 gap-2 mb-3">
             {daysOfWeek.map((day) => (
               <div key={day} className={`text-center text-xs font-bold ${
@@ -327,13 +330,15 @@ export default function Calendar({ darkMode = true, userId, atividadesRealizadas
             ))}
           </div>
 
-          {/* Grade do calendário */}
           <div className="grid grid-cols-7 gap-2 relative">
             {calendarDays.map((item, index) => (
-              <div key={index} className="relative">
+              <div
+                key={index}
+                className="relative"
+                onMouseEnter={() => item.isCurrentMonth && setHoveredDay(index)}
+                onMouseLeave={() => setHoveredDay(null)}
+              >
                 <button
-                  onMouseEnter={() => item.isCurrentMonth && setHoveredDay(index)}
-                  onMouseLeave={() => setHoveredDay(null)}
                   className={`
                     w-full aspect-square rounded-lg flex flex-col items-center justify-center
                     text-sm font-semibold transition-all border
@@ -362,24 +367,42 @@ export default function Calendar({ darkMode = true, userId, atividadesRealizadas
                     <div className="font-bold mb-2 text-emerald-400">
                       {item.day} de {monthNames[currentDate.getMonth()]}
                     </div>
-                    <div className="space-y-2">
+                    <div className="space-y-2 max-h-44 overflow-y-auto pr-2">
                       {item.atividades.map((atividade, i) => (
                         <div key={i} className={`text-xs p-2 rounded border ${
                           darkMode ? 'bg-slate-600/50 border-slate-500' : 'bg-slate-50 border-slate-200'
                         }`}>
-                          <div className="flex justify-between items-center">
-                            <span className="font-medium">Atividade #{atividade.id}</span>
+                          <div className="flex justify-between items-center mb-1">
+                            <span className="font-medium">
+                              {atividade.tipo === 'redacao' ? '✍️ Redação' : '📚 Atividade'}
+                            </span>
                             <span className={`font-bold ${
-                              atividade.nota >= 7 ? 'text-green-400' : 
-                              atividade.nota >= 5 ? 'text-yellow-400' : 'text-red-400'
+                              atividade.tipo === 'redacao' 
+                                ? (atividade.notaOriginal && atividade.notaOriginal >= 700 ? 'text-green-400' : 
+                                   atividade.notaOriginal && atividade.notaOriginal >= 500 ? 'text-yellow-400' : 'text-red-400')
+                                : (atividade.nota >= 7 ? 'text-green-400' : 
+                                   atividade.nota >= 5 ? 'text-yellow-400' : 'text-red-400')
                             }`}>
-                              {atividade.nota.toFixed(1)}
+                              {atividade.tipo === 'redacao' && atividade.notaOriginal
+                                ? `${atividade.notaOriginal.toFixed(0)}/1000`
+                                : `${atividade.nota.toFixed(1)}/10`
+                              }
                             </span>
                           </div>
-                          <div className={`text-[10px] mt-1 ${
+                          <div className={`font-medium mb-1 ${
+                            darkMode ? 'text-slate-300' : 'text-slate-700'
+                          }`}>
+                            {atividade.materia}
+                          </div>
+                          <div className={`text-[10px] mb-1 ${
                             darkMode ? 'text-slate-400' : 'text-slate-600'
                           }`}>
-                            {atividade.hora} • {atividade.status}
+                            {atividade.tema}
+                          </div>
+                          <div className={`text-[10px] ${
+                            darkMode ? 'text-slate-500' : 'text-slate-500'
+                          }`}>
+                            {atividade.hora}
                           </div>
                         </div>
                       ))}
@@ -390,9 +413,7 @@ export default function Calendar({ darkMode = true, userId, atividadesRealizadas
             ))}
           </div>
 
-          {/* Estatísticas e Legenda */}
           <div className="mt-6 space-y-4">
-            {/* Sequências */}
             <div className="grid grid-cols-2 gap-3">
               <div className={`p-3 rounded-xl border ${
                 darkMode ? 'bg-slate-700/30 border-slate-600' : 'bg-slate-50 border-slate-200'
@@ -416,7 +437,6 @@ export default function Calendar({ darkMode = true, userId, atividadesRealizadas
               </div>
             </div>
 
-            {/* Legenda */}
             <div className={`pt-4 border-t ${darkMode ? 'border-slate-700' : 'border-slate-200'}`}>
               <div className="flex items-center justify-between text-xs">
                 <span className={darkMode ? 'text-slate-400' : 'text-slate-600'}>

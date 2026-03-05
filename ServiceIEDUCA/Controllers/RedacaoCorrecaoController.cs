@@ -32,31 +32,20 @@ namespace ServiceIEDUCA.Controllers
             {
                 _logger.LogInformation("Recebendo redação para correção");
 
-                var correcaoDb = new RedacaoCorrecoes
-                {
-                    UserId = request.UserId,
-                    Tema = request.Tema,
-                    TextoRedacao = request.TextoRedacao,
-                    NotaZero = false,
-                    NotaTotal = 0,
-                    ResumoFinal = "Processando correção...",
-                    ConfiancaAvaliacao = null,
-                    Status = "Processando",
-                    Progresso = 10,
-                    TipoAvaliacao = request.TipoAvaliacao ?? "ENEM",
-                    CriadoEm = DateTime.Now
-                };
+                var correcaoDb = await _redacaoService.IniciarCorrecaoAsync(
+                    request.UserId,
+                    request.AtividadeExecucaoId,
+                    request.Tema,
+                    request.TextoRedacao,
+                    request.TipoAvaliacao ?? "ENEM");
 
-                _context.RedacaoCorrecoes.Add(correcaoDb);
-                await _context.SaveChangesAsync();
-
-                _ = Task.Run(async () => await _redacaoService.ProcessarCorrecaoAsync(correcaoDb.Id));
+                var ehRascunho = string.Equals(request.TipoAvaliacao, "rascunho", StringComparison.OrdinalIgnoreCase);
 
                 return Ok(new
                 {
                     id = correcaoDb.Id,
-                    message = "Redação enviada para correção!",
-                    status = correcaoDb.Status,
+                    message = ehRascunho ? "Rascunho salvo com sucesso!" : "Redação enviada para correção!",
+                    status = ehRascunho ? "rascunho" : "processando",
                     progresso = correcaoDb.Progresso
                 });
             }
@@ -64,6 +53,318 @@ namespace ServiceIEDUCA.Controllers
             {
                 _logger.LogError(ex, "Erro ao corrigir redação");
                 return StatusCode(500, new { message = "Erro ao processar", error = ex.Message });
+            }
+        }
+
+        [HttpPost("corrigir-stream")]
+        public async Task CorrigirRedacaoStream([FromBody] CorrecaoRedacaoRequest request)
+        {
+            Response.StatusCode = 200;
+            Response.ContentType = "application/x-ndjson; charset=utf-8";
+            Response.Headers["Cache-Control"] = "no-cache";
+            Response.Headers["X-Accel-Buffering"] = "no";
+
+            async Task EnviarEventoAsync(object evento)
+            {
+                var linha = JsonSerializer.Serialize(evento) + "\n";
+                await Response.WriteAsync(linha);
+                await Response.Body.FlushAsync();
+            }
+
+            try
+            {
+                _logger.LogInformation("Recebendo redação para correção via stream");
+
+                await EnviarEventoAsync(new { type = "progress", percent = 5, message = "Recebendo redação..." });
+
+                var correcaoDb = await _redacaoService.IniciarCorrecaoAsync(
+                    request.UserId,
+                    request.AtividadeExecucaoId,
+                    request.Tema,
+                    request.TextoRedacao,
+                    request.TipoAvaliacao ?? "ENEM");
+
+                var ehRascunho = string.Equals(request.TipoAvaliacao, "rascunho", StringComparison.OrdinalIgnoreCase);
+                var statusInicial = ehRascunho ? "rascunho" : "processando";
+
+                await EnviarEventoAsync(new
+                {
+                    type = "started",
+                    correcaoId = correcaoDb.Id,
+                    status = statusInicial,
+                    percent = correcaoDb.Progresso,
+                    message = ehRascunho ? "Rascunho salvo" : "Correção iniciada"
+                });
+
+                if (ehRascunho)
+                {
+                    await EnviarEventoAsync(new
+                    {
+                        type = "completed",
+                        correcaoId = correcaoDb.Id,
+                        status = "rascunho",
+                        percent = 100,
+                        message = "Rascunho salvo com sucesso"
+                    });
+                    return;
+                }
+
+                var timeout = TimeSpan.FromMinutes(3);
+                var inicio = DateTime.UtcNow;
+                var ultimoPercent = -1;
+                string ultimoStatus = string.Empty;
+
+                while (DateTime.UtcNow - inicio < timeout)
+                {
+                    var statusAtual = await _context.RedacaoCorrecoes
+                        .Where(r => r.Id == correcaoDb.Id)
+                        .Select(r => new
+                        {
+                            r.Id,
+                            r.Progresso,
+                            r.Status,
+                            r.NotaTotal,
+                            r.TipoAvaliacao
+                        })
+                        .FirstOrDefaultAsync();
+
+                    if (statusAtual == null)
+                    {
+                        await EnviarEventoAsync(new { type = "error", message = "Correção não encontrada" });
+                        return;
+                    }
+
+                    var statusNormalizado = NormalizarStatus(statusAtual.Status, statusAtual.TipoAvaliacao);
+                    var progresso = Math.Max(0, Math.Min(100, statusAtual.Progresso));
+
+                    if (progresso != ultimoPercent || statusNormalizado != ultimoStatus)
+                    {
+                        await EnviarEventoAsync(new
+                        {
+                            type = "progress",
+                            correcaoId = statusAtual.Id,
+                            percent = progresso,
+                            status = statusNormalizado,
+                            message = ObterMensagemProgresso(progresso, statusNormalizado)
+                        });
+
+                        ultimoPercent = progresso;
+                        ultimoStatus = statusNormalizado;
+                    }
+
+                    if (statusNormalizado == "concluida" || statusNormalizado == "erro")
+                    {
+                        await EnviarEventoAsync(new
+                        {
+                            type = "completed",
+                            correcaoId = statusAtual.Id,
+                            percent = progresso,
+                            status = statusNormalizado,
+                            notaTotal = statusAtual.NotaTotal,
+                            message = statusNormalizado == "concluida" ? "Correção concluída" : "Correção finalizada com erro"
+                        });
+                        return;
+                    }
+
+                    await Task.Delay(1000);
+                }
+
+                await EnviarEventoAsync(new
+                {
+                    type = "timeout",
+                    correcaoId = correcaoDb.Id,
+                    percent = Math.Max(ultimoPercent, 0),
+                    status = "processando",
+                    message = "A correção continua em processamento. Você pode acompanhar no histórico."
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Erro no stream de correção de redação");
+                await EnviarEventoAsync(new { type = "error", message = "Erro ao processar correção" });
+            }
+        }
+
+        [HttpGet("progresso-stream/{id}")]
+        public async Task ProgressoRedacaoStream(int id)
+        {
+            Response.StatusCode = 200;
+            Response.ContentType = "application/x-ndjson; charset=utf-8";
+            Response.Headers["Cache-Control"] = "no-cache";
+            Response.Headers["X-Accel-Buffering"] = "no";
+
+            async Task EnviarEventoAsync(object evento)
+            {
+                var linha = JsonSerializer.Serialize(evento) + "\n";
+                await Response.WriteAsync(linha);
+                await Response.Body.FlushAsync();
+            }
+
+            try
+            {
+                var timeout = TimeSpan.FromMinutes(3);
+                var inicio = DateTime.UtcNow;
+                var ultimoPercent = -1;
+                string ultimoStatus = string.Empty;
+
+                while (DateTime.UtcNow - inicio < timeout)
+                {
+                    var statusAtual = await _context.RedacaoCorrecoes
+                        .Where(r => r.Id == id)
+                        .Select(r => new
+                        {
+                            r.Id,
+                            r.Progresso,
+                            r.Status,
+                            r.NotaTotal,
+                            r.TipoAvaliacao
+                        })
+                        .FirstOrDefaultAsync();
+
+                    if (statusAtual == null)
+                    {
+                        await EnviarEventoAsync(new { type = "error", message = "Correção não encontrada" });
+                        return;
+                    }
+
+                    var statusNormalizado = NormalizarStatus(statusAtual.Status, statusAtual.TipoAvaliacao);
+                    var progresso = Math.Max(0, Math.Min(100, statusAtual.Progresso));
+
+                    if (progresso != ultimoPercent || statusNormalizado != ultimoStatus)
+                    {
+                        await EnviarEventoAsync(new
+                        {
+                            type = "progress",
+                            correcaoId = statusAtual.Id,
+                            percent = progresso,
+                            status = statusNormalizado,
+                            notaTotal = statusAtual.NotaTotal,
+                            message = ObterMensagemProgresso(progresso, statusNormalizado)
+                        });
+
+                        ultimoPercent = progresso;
+                        ultimoStatus = statusNormalizado;
+                    }
+
+                    if (statusNormalizado == "concluida" || statusNormalizado == "erro")
+                    {
+                        await EnviarEventoAsync(new
+                        {
+                            type = "completed",
+                            correcaoId = statusAtual.Id,
+                            percent = progresso,
+                            status = statusNormalizado,
+                            notaTotal = statusAtual.NotaTotal,
+                            message = statusNormalizado == "concluida" ? "Correção concluída" : "Correção finalizada com erro"
+                        });
+                        return;
+                    }
+
+                    await Task.Delay(1000);
+                }
+
+                await EnviarEventoAsync(new
+                {
+                    type = "timeout",
+                    correcaoId = id,
+                    status = "processando",
+                    percent = Math.Max(ultimoPercent, 0),
+                    message = "A correção continua em processamento."
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Erro no stream de progresso da correção {CorrecaoId}", id);
+                await EnviarEventoAsync(new { type = "error", message = "Erro ao acompanhar progresso" });
+            }
+        }
+
+        private static string NormalizarStatus(string? status, string? tipoAvaliacao)
+        {
+            if (!string.IsNullOrWhiteSpace(tipoAvaliacao) && tipoAvaliacao.Equals("rascunho", StringComparison.OrdinalIgnoreCase))
+                return "rascunho";
+
+            var valor = status?.ToLowerInvariant() ?? string.Empty;
+            if (valor.Contains("erro")) return "erro";
+            if (valor.Contains("conclu")) return "concluida";
+            return "processando";
+        }
+
+        private static string ObterMensagemProgresso(int progresso, string status)
+        {
+            if (status == "erro") return "Erro na correção";
+            if (status == "concluida") return "Correção concluída";
+
+            if (progresso < 20) return "Analisando texto";
+            if (progresso < 60) return "Avaliando competências";
+            if (progresso < 90) return "Consolidando feedback";
+            return "Finalizando correção";
+        }
+
+        [HttpPost("{id}/reenviar")]
+        public async Task<ActionResult<object>> ReenviarRedacao(int id)
+        {
+            try
+            {
+                _logger.LogInformation("Reenviando redação existente {CorrecaoId}", id);
+
+                var correcaoDb = await _redacaoService.ReenviarCorrecaoAsync(id);
+
+                return Ok(new
+                {
+                    id = correcaoDb.Id,
+                    tema = correcaoDb.Tema,
+                    message = "Redação reenviada para correção!",
+                    status = "processando",
+                    progresso = correcaoDb.Progresso
+                });
+            }
+            catch (KeyNotFoundException)
+            {
+                return NotFound(new { message = "Redação não encontrada" });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Erro ao reenviar redação {CorrecaoId}", id);
+                return StatusCode(500, new { message = "Erro ao reenviar redação", error = ex.Message });
+            }
+        }
+
+        [HttpPut("{id}/rascunho")]
+        public async Task<ActionResult<object>> AtualizarRascunho(int id, [FromBody] AtualizarRascunhoRequest request)
+        {
+            try
+            {
+                var redacao = await _context.RedacaoCorrecoes
+                    .FirstOrDefaultAsync(r => r.Id == id);
+
+                if (redacao == null)
+                    return NotFound(new { message = "Rascunho não encontrado" });
+
+                if (!string.Equals(redacao.TipoAvaliacao, "rascunho", StringComparison.OrdinalIgnoreCase))
+                    return BadRequest(new { message = "A redação informada não é um rascunho" });
+
+                redacao.Tema = string.IsNullOrWhiteSpace(request.Tema) ? "Rascunho sem tema" : request.Tema;
+                redacao.TextoRedacao = request.TextoRedacao;
+                redacao.AtualizadoEm = DateTime.UtcNow;
+                redacao.Status = "Rascunho";
+                redacao.ResumoFinal = "Rascunho salvo";
+                redacao.Progresso = 0;
+
+                await _context.SaveChangesAsync();
+
+                return Ok(new
+                {
+                    id = redacao.Id,
+                    tema = redacao.Tema,
+                    status = "rascunho",
+                    message = "Rascunho atualizado com sucesso"
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Erro ao atualizar rascunho {CorrecaoId}", id);
+                return StatusCode(500, new { message = "Erro ao atualizar rascunho", error = ex.Message });
             }
         }
 
@@ -80,9 +381,16 @@ namespace ServiceIEDUCA.Controllers
                         id = r.Id,
                         tema = r.Tema ?? "Sem Tema",
                         dataEnvio = r.CriadoEm,
-                        status = (r.Progresso >= 100 || r.NotaTotal > 0) ? "concluida" : "processando",
+                        status = r.TipoAvaliacao != null && r.TipoAvaliacao.ToLower() == "rascunho"
+                            ? "rascunho"
+                            : r.Status != null && r.Status.ToLower().Contains("erro")
+                            ? "erro"
+                            : (r.Status != null && r.Status.ToLower().Contains("conclu"))
+                                ? "concluida"
+                                : "processando",
                         progresso = r.Progresso,
-                        notaTotal = r.NotaTotal
+                        notaTotal = r.NotaTotal,
+                        tipoAvaliacao = r.TipoAvaliacao
                     })
                     .ToListAsync();
 
@@ -106,7 +414,13 @@ namespace ServiceIEDUCA.Controllers
                     {
                         correcaoId = r.Id,
                         progresso = r.Progresso,
-                        status = r.Status != null ? r.Status.ToLower() : "processando",
+                        status = r.TipoAvaliacao != null && r.TipoAvaliacao.ToLower() == "rascunho"
+                            ? "rascunho"
+                            : r.Status != null && r.Status.ToLower().Contains("erro")
+                            ? "erro"
+                            : (r.Status != null && r.Status.ToLower().Contains("conclu"))
+                                ? "concluida"
+                                : "processando",
                         notaTotal = r.NotaTotal
                     })
                     .FirstOrDefaultAsync();
@@ -166,6 +480,7 @@ namespace ServiceIEDUCA.Controllers
                     id = correcaoDb.Id,
                     tema = correcaoDb.Tema,
                     textoRedacao = correcaoDb.TextoRedacao,
+                    tipoAvaliacao = correcaoDb.TipoAvaliacao,
                     notaZero = correcaoDb.NotaZero,
                     notaTotal = correcaoDb.NotaTotal,
                     resumoFinal = correcaoDb.ResumoFinal,
@@ -216,5 +531,11 @@ namespace ServiceIEDUCA.Controllers
         public string Tema { get; set; } = string.Empty;
         public string TextoRedacao { get; set; } = string.Empty;
         public string? TipoAvaliacao { get; set; }
+    }
+
+    public class AtualizarRascunhoRequest
+    {
+        public string Tema { get; set; } = string.Empty;
+        public string TextoRedacao { get; set; } = string.Empty;
     }
 }

@@ -92,7 +92,7 @@ namespace ServiceIEDUCA.Controllers
                 Nome = escolaDto.Nome,
                 Email = escolaDto.Email,
                 senha = BCrypt.Net.BCrypt.HashPassword(escolaDto.Senha),
-                data_criacao = DateTime.Now
+                data_criacao = DateTime.UtcNow
             };
 
             _context.escola.Add(escola);

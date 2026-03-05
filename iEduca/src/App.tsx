@@ -8,6 +8,7 @@ import { AtividadeIAPage } from './pages/AtividadeIA';
 import Redacao from './pages/Aluno/Redacao/Redacao';
 import HistoricoRedacoes from './pages/Aluno/Redacao/HistoricoRedacoes';
 import RedacaoCorrecaoView from './pages/Aluno/Redacao/RedacaoCorrecaoView';
+import Ranking from './pages/Aluno/Ranking';
 import EscolaDashboard from './pages/Escola/Dashboard';
 import ProfessorDashboard from './pages/Professor/Dashboard';
 import PrivateRoute from './components/PrivateRoute';
@@ -28,6 +29,7 @@ function App() {
         <Route path="/aluno/redacao/nova" element={<Redacao />} />
         <Route path="/aluno/redacao/historico" element={<HistoricoRedacoes />} />
         <Route path="/aluno/redacao/:id" element={<RedacaoCorrecaoView />} />
+        <Route path="/aluno/ranking" element={<Ranking />} />
         <Route path="/" element={<Navigate to="/login" />} />
         <Route path="*" element={<Navigate to="/login" />} />
       </Routes>

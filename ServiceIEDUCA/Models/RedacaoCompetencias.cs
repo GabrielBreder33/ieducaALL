@@ -29,7 +29,7 @@ namespace ServiceIEDUCA.Models
 
         public string? Melhorias { get; set; }
 
-        public DateTime CriadoEm { get; set; } = DateTime.Now;
+        public DateTime CriadoEm { get; set; } = DateTime.UtcNow;
 
         // Relacionamento
         [ForeignKey("RedacaoCorrecaoId")]

@@ -17,7 +17,7 @@ namespace ServiceIEDUCA.Models
 
         public string? SugestoesConcretas { get; set; }
 
-        public DateTime CriadoEm { get; set; } = DateTime.Now;
+        public DateTime CriadoEm { get; set; } = DateTime.UtcNow;
 
         // Relacionamento
         [ForeignKey("RedacaoCorrecaoId")]

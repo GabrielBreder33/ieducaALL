@@ -30,7 +30,7 @@ namespace ServiceIEDUCA.Models
         [MaxLength(20)]
         public string? Severidade { get; set; }
 
-        public DateTime CriadoEm { get; set; } = DateTime.Now;
+        public DateTime CriadoEm { get; set; } = DateTime.UtcNow;
 
         // Relacionamento
         [ForeignKey("RedacaoCorrecaoId")]

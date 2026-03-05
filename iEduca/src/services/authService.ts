@@ -1,6 +1,6 @@
 import type { User, LoginRequest, RegisterRequest, AuthResponse } from '../types';
 
-const API_URL = 'http://localhost:5000/api';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 class AuthService {
   async login(email: string, senha: string): Promise<User> {
@@ -14,8 +14,21 @@ class AuthService {
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Erro ao fazer login');
+        if (response.status === 400 || response.status === 401) {
+          throw new Error('Email ou senha incorretos');
+        }
+
+        let errorMessage = 'Erro ao fazer login';
+        try {
+          const error = await response.json();
+          errorMessage = error?.message || (typeof error === 'string' ? error : JSON.stringify(error));
+        } catch {
+          try {
+            const text = await response.text();
+            if (text) errorMessage = text;
+          } catch {}
+        }
+        throw new Error(errorMessage || 'Erro ao fazer login');
       }
 
       const userData: User = await response.json();
@@ -47,8 +60,17 @@ class AuthService {
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Erro ao cadastrar');
+        let errorMessage = 'Erro ao cadastrar';
+        try {
+          const error = await response.json();
+          errorMessage = error?.message || (typeof error === 'string' ? error : JSON.stringify(error));
+        } catch {
+          try {
+            const text = await response.text();
+            if (text) errorMessage = text;
+          } catch {}
+        }
+        throw new Error(errorMessage || 'Erro ao cadastrar');
       }
 
       const data: AuthResponse = await response.json();

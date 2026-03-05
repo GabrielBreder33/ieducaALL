@@ -5,6 +5,7 @@ namespace ServiceIEDUCA.Services
     public interface IRedacaoCorrecaoService
     {
         Task<RedacaoCorrecoes> IniciarCorrecaoAsync(int userId, int? atividadeExecucaoId, string tema, string textoRedacao, string tipoAvaliacao);
+        Task<RedacaoCorrecoes> ReenviarCorrecaoAsync(int correcaoId);
         Task ProcessarCorrecaoAsync(int correcaoId);
         Task<RedacaoCorrecoes?> ObterCorrecaoAsync(int correcaoId);
         Task<List<RedacaoCorrecoes>> ObterCorrecoesUsuarioAsync(int userId);

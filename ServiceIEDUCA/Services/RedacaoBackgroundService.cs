@@ -46,7 +46,7 @@ namespace ServiceIEDUCA.Services
             var correcoesTravadas = await context.RedacaoCorrecoes
                 .Where(r => r.Status == "Processando" && 
                            r.Progresso < 100 &&
-                           r.CriadoEm < DateTime.Now.AddMinutes(-5))
+                           r.CriadoEm < DateTime.UtcNow.AddMinutes(-5))
                 .ToListAsync(cancellationToken);
 
             foreach (var correcao in correcoesTravadas)

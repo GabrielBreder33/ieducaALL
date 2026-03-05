@@ -15,7 +15,7 @@ namespace ServiceIEDUCA.Models
         public int AtividadeId { get; set; }
 
         [Required]
-        public DateTime DataInicio { get; set; } = DateTime.Now;
+        public DateTime DataInicio { get; set; } = DateTime.UtcNow;
 
         public DateTime? DataFim { get; set; }
 
@@ -36,7 +36,7 @@ namespace ServiceIEDUCA.Models
         /// </summary>
         public int? TempoGastoSegundos { get; set; }
 
-        public DateTime CriadoEm { get; set; } = DateTime.Now;
+        public DateTime CriadoEm { get; set; } = DateTime.UtcNow;
 
         [MaxLength(20)]
         public string Status { get; set; } = "Em Andamento"; // Em Andamento, Concluída, Abandonada
@@ -67,7 +67,7 @@ namespace ServiceIEDUCA.Models
     public string? GabaritoJson { get; set; }
     public string? RespostasJson { get; set; }
 
-    public DateTime AtualizadoEm { get; set; } = DateTime.Now;
+    public DateTime AtualizadoEm { get; set; } = DateTime.UtcNow;
 
 
         [ForeignKey("AtividadeId")]

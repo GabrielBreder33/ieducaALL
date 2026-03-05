@@ -53,6 +53,13 @@ export interface EssayCorrection {
   propostaIntervencao?: PropostaIntervencao;
 }
 
+export interface EssayStreamResult {
+  correcaoId: number;
+  status: 'processando' | 'concluida' | 'erro' | 'rascunho';
+  progresso: number;
+  notaTotal?: number;
+}
+
 export interface LegacyEssayCorrection {
   positivePoints: string[];
   improvementPoints: string[];
@@ -63,7 +70,145 @@ export interface LegacyEssayCorrection {
   competencies: CompetencyScore[];
 }
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+
 export const aiService = {
+  async correctEssayStream(
+    userId: number,
+    atividadeExecucaoId: number | null,
+    theme: string,
+    content: string,
+    type: string = 'ENEM',
+    onProgress?: (percent: number, message: string, status: string, correcaoId?: number) => void
+  ): Promise<EssayStreamResult> {
+    try {
+      const response = await fetch(`${API_URL}/RedacaoCorrecao/corrigir-stream`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId,
+          atividadeExecucaoId,
+          tema: theme,
+          textoRedacao: content,
+          tipoAvaliacao: type
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Erro ao iniciar correção via stream');
+      }
+
+      if (!response.body) {
+        throw new Error('Servidor não retornou stream de progresso');
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let correcaoId: number | undefined;
+      let statusFinal: EssayStreamResult['status'] = 'processando';
+      let progressoFinal = 0;
+      let notaTotal: number | undefined;
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const rawLine of lines) {
+          const line = rawLine.trim();
+          if (!line) continue;
+
+          let event: any;
+          try {
+            event = JSON.parse(line);
+          } catch {
+            continue;
+          }
+
+          if (typeof event.correcaoId === 'number') {
+            correcaoId = event.correcaoId;
+          }
+
+          if (typeof event.percent === 'number') {
+            progressoFinal = Math.max(0, Math.min(100, event.percent));
+          }
+
+          if (typeof event.status === 'string') {
+            statusFinal = event.status;
+          }
+
+          if (typeof event.notaTotal === 'number') {
+            notaTotal = event.notaTotal;
+          }
+
+          if (event.type === 'progress' || event.type === 'started') {
+            onProgress?.(
+              progressoFinal,
+              event.message || 'Processando redação...',
+              statusFinal,
+              correcaoId
+            );
+          }
+
+          if (event.type === 'timeout') {
+            onProgress?.(
+              progressoFinal,
+              event.message || 'A correção continua em processamento no histórico.',
+              'processando',
+              correcaoId
+            );
+            return {
+              correcaoId: correcaoId || 0,
+              status: 'processando',
+              progresso: progressoFinal,
+              notaTotal
+            };
+          }
+
+          if (event.type === 'error') {
+            throw new Error(event.message || 'Erro na correção de redação');
+          }
+
+          if (event.type === 'completed') {
+            onProgress?.(
+              progressoFinal,
+              event.message || 'Correção concluída',
+              statusFinal,
+              correcaoId
+            );
+
+            return {
+              correcaoId: correcaoId || 0,
+              status: statusFinal,
+              progresso: progressoFinal,
+              notaTotal
+            };
+          }
+        }
+      }
+
+      if (!correcaoId) {
+        throw new Error('Stream finalizado sem identificar correção');
+      }
+
+      return {
+        correcaoId,
+        status: statusFinal,
+        progresso: progressoFinal,
+        notaTotal
+      };
+    } catch (error) {
+      console.error('❌ ERRO no stream de correção:', error);
+      throw error;
+    }
+  },
+
   async correctEssay(
     userId: number,
     atividadeExecucaoId: number | null,
@@ -72,7 +217,7 @@ export const aiService = {
     type: string = 'ENEM'
   ): Promise<EssayCorrection> {
     try {
-      const response = await fetch('http://localhost:5000/api/RedacaoCorrecao/corrigir', {
+      const response = await fetch(`${API_URL}/RedacaoCorrecao/corrigir`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -258,11 +403,14 @@ export const aiService = {
 
   // ===== SISTEMA DE GERAÇÃO DE ATIVIDADES COM IA =====
   
-  async gerarAtividade(configuracao: import('../types/atividade').ConfiguracaoAtividade): Promise<import('../types/atividade').AtividadeGerada> {
+  async gerarAtividadeStream(
+    configuracao: import('../types/atividade').ConfiguracaoAtividade,
+    onProgress?: (percent: number, message: string) => void
+  ): Promise<import('../types/atividade').AtividadeGerada> {
     try {
       const prompt = this.construirPrompt(configuracao);
       
-      const response = await fetch('http://localhost:5000/api/AtividadeIA/gerar', {
+      const response = await fetch(`${API_URL}/AtividadeIA/gerar-stream`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -277,15 +425,78 @@ export const aiService = {
         throw new Error('Erro ao gerar atividade');
       }
 
-      const atividadeGerada = await response.json();
-      return atividadeGerada;
+      if (!response.body) {
+        const fallbackPayload = await response.json();
+        if (fallbackPayload?.atividade) {
+          return fallbackPayload.atividade;
+        }
+        return fallbackPayload;
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let atividadeFinal: import('../types/atividade').AtividadeGerada | null = null;
+
+      while (true) {
+        const { value, done } = await reader.read();
+
+        if (done) {
+          break;
+        }
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const rawLine of lines) {
+          const line = rawLine.trim();
+          if (!line) continue;
+
+          let event: any;
+          try {
+            event = JSON.parse(line);
+          } catch (parseOrEventError) {
+            console.warn('⚠️ Evento de stream inválido:', parseOrEventError);
+            continue;
+          }
+
+          if (event.type === 'progress') {
+            const percent = typeof event.percent === 'number' ? event.percent : 0;
+            const message = typeof event.message === 'string' ? event.message : 'Processando...';
+            onProgress?.(percent, message);
+          }
+
+          if (event.type === 'completed' && event.atividade) {
+            atividadeFinal = event.atividade;
+          }
+
+          if (event.type === 'error') {
+            throw new Error(event.message || 'Erro ao gerar atividade');
+          }
+        }
+      }
+
+      if (!atividadeFinal) {
+        throw new Error('Fluxo de geração finalizado sem atividade');
+      }
+
+      return atividadeFinal;
     } catch (error) {
       console.error('❌ ERRO ao gerar atividade:', error);
       throw error;
     }
   },
 
+  async gerarAtividade(configuracao: import('../types/atividade').ConfiguracaoAtividade): Promise<import('../types/atividade').AtividadeGerada> {
+    return this.gerarAtividadeStream(configuracao);
+  },
+
   construirPrompt(config: import('../types/atividade').ConfiguracaoAtividade): string {
+    const contextoConcurso = config.segmento === 'Concurso' && config.concurso
+      ? `\nConcurso alvo: ${config.concurso}\nAs questões devem seguir o estilo e padrão de cobrança desse concurso.`
+      : '';
+
     const promptBase = `Você é um professor especialista em ${config.materia}, com experiência em ensino para ${config.segmento}.
 
 Gere ${config.quantidade} questões sobre o conteúdo:
@@ -293,6 +504,7 @@ Gere ${config.quantidade} questões sobre o conteúdo:
 
 Público-alvo:
 Alunos do ${config.ano}
+${contextoConcurso}
 
 Configurações:
 - Nível de dificuldade: ${config.nivel}
@@ -340,7 +552,8 @@ Formato de saída JSON:
       'Fundamental I': '\n- Use linguagem simples e lúdica\n- Evite termos técnicos complexos\n- Prefira exemplos do cotidiano infantil',
       'Fundamental II': '\n- Use linguagem clara, mas já pode introduzir conceitos mais elaborados\n- Contextualize com situações do dia a dia de adolescentes',
       'Ensino Médio': '\n- Use linguagem técnica adequada\n- Pode exigir raciocínio mais abstrato\n- Contextualize com temas contemporâneos',
-      'ENEM': '\n- Siga o padrão ENEM rigorosamente\n- Use interdisciplinaridade\n- Contextualize com situações reais e atuais\n- Exija interpretação e raciocínio crítico'
+      'ENEM': '\n- Siga o padrão ENEM rigorosamente\n- Use interdisciplinaridade\n- Contextualize com situações reais e atuais\n- Exija interpretação e raciocínio crítico',
+      'Concurso': '\n- Siga o perfil de cobrança de concursos públicos\n- Priorize enunciados objetivos e de alta precisão\n- Explore pegadinhas comuns e interpretação de banca\n- Mantenha padrão compatível com provas de concurso'
     };
     return regras[segmento] || '';
   },
@@ -382,15 +595,26 @@ Para cada questão:
     atividadeId: string,
     gabarito: import('../types/atividade').Gabarito[],
     respostas: import('../types/atividade').RespostaAluno[],
-    atividade?: import('../types/atividade').AtividadeGerada
+    atividade?: {
+      configuracao?: import('../types/atividade').ConfiguracaoAtividade;
+      questoes?: import('../types/atividade').Questao[];
+    }
   ): Promise<import('../types/atividade').ResultadoAtividade> {
     try {
       // Obter userId do localStorage
       const userStr = localStorage.getItem('user');
       const user = userStr ? JSON.parse(userStr) : null;
-      const userId = user?.id;
+      const userIdStorage = Number(user?.id);
+      const userIdAtividade = Number((atividadeId || '').split('_')[0]);
+      const userId = Number.isFinite(userIdStorage) && userIdStorage > 0
+        ? userIdStorage
+        : (Number.isFinite(userIdAtividade) && userIdAtividade > 0 ? userIdAtividade : 0);
 
-      const response = await fetch('http://localhost:5000/api/AtividadeIA/corrigir', {
+      if (!userId || userId <= 0) {
+        throw new Error('Usuário inválido. Faça login novamente para salvar a atividade.');
+      }
+
+      const response = await fetch(`${API_URL}/AtividadeIA/corrigir`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -406,7 +630,14 @@ Para cada questão:
       });
 
       if (!response.ok) {
-        throw new Error('Erro ao corrigir atividade');
+        let detalhe = 'Erro ao corrigir atividade';
+        try {
+          const erroApi = await response.json();
+          detalhe = erroApi?.message || erroApi?.error || detalhe;
+        } catch {
+          // mantém mensagem padrão
+        }
+        throw new Error(detalhe);
       }
 
       const resultado = await response.json();
@@ -419,7 +650,7 @@ Para cada questão:
 
   async buscarHistoricoAtividades(userId: number): Promise<any[]> {
     try {
-      const response = await fetch(`http://localhost:5000/api/AtividadeIA/historico/${userId}`, {
+      const response = await fetch(`${API_URL}/AtividadeIA/historico/${userId}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -440,7 +671,7 @@ Para cada questão:
 
   async buscarDetalheAtividade(userId: number, atividadeId: number): Promise<any> {
     try {
-      const response = await fetch(`http://localhost:5000/api/AtividadeIA/historico/${userId}/${atividadeId}`, {
+      const response = await fetch(`${API_URL}/AtividadeIA/historico/${userId}/${atividadeId}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',

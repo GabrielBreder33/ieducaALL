@@ -37,7 +37,33 @@ export default function Login() {
         }
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Senha incorreta ou usuário não encontrado');
+      const msg = err instanceof Error ? err.message : String(err);
+      const lower = msg.toLowerCase();
+
+      // Erros de rede/servidor -> mensagem genérica de indisponibilidade
+      if (
+        lower.includes('failed to fetch') ||
+        lower.includes('networkerror') ||
+        lower.includes('network request') ||
+        lower.includes('service unavailable') ||
+        lower.includes('temporarily') ||
+        lower.includes('503') ||
+        lower.includes('500') ||
+        lower.includes('offline')
+      ) {
+        setError('Estamos temporariamente fora do ar. Voltamos em breve.');
+      } else if (
+        // Erros que indicam credenciais inválidas
+        lower.includes('senha') ||
+        lower.includes('email') ||
+        lower.includes('incorreto') ||
+        lower.includes('não encontrado') ||
+        lower.includes('not found')
+      ) {
+        setError('Email ou senha estão incorretos.');
+      } else {
+        setError(msg || 'Ocorreu um erro ao tentar fazer login.');
+      }
     } finally {
       setLoading(false);
     }

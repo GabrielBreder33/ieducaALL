@@ -14,6 +14,7 @@ namespace ServiceIEDUCA.Services
         Task<IEnumerable<UserDto>> GetAlunosByEscolaAsync(int escolaId);
         Task<IEnumerable<UserDto>> GetUsuariosByEscolaAsync(int escolaId);
         Task<bool> ResetPasswordAsync(int userId, string novaSenha);
+        Task<UserDto?> UpdateSelfProfileAsync(int id, UserSelfUpdateDto dto);
 
     }
 }

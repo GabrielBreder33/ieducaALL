@@ -1,39 +1,57 @@
-﻿import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { authService } from '../../../services/authService';
 import type { User } from '../../../types';
+import type { EssayCorrection, CompetencyScore } from '../../../services/aiService';
 import { NotificationDropdown, ProfileMenu } from '../../../components/Dashboard';
+import { AlunoSidebar } from '../../../components/AlunoSidebar';
 import { useSSEProgress } from '../../../hooks/useSSEProgress';
+
+type HighlightTone = 'success' | 'neutral' | 'warning';
+
+type ExtendedEssayCorrection = EssayCorrection & {
+  tema?: string;
+  tipoAvaliacao?: string;
+  textoRedacao?: string;
+  dataCorrecao?: string;
+  dataConclusao?: string;
+  dataCriacao?: string;
+};
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 export default function RedacaoCorrecaoView() {
   const { id } = useParams<{ id: string }>();
   const [user, setUser] = useState<User | null>(null);
   const navigate = useNavigate();
-  const [darkMode, setDarkMode] = useState<boolean>(false);
-  const correcaoId = id ? parseInt(id) : null;
-  
-  const { progressData, error: sseError, isConnected } = useSSEProgress(correcaoId);
-  const [correcaoCompleta, setCorrecaoCompleta] = useState<any>(null);
-  const [mostrarCorrecao, setMostrarCorrecao] = useState<boolean>(false);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [erroSelecionado, setErroSelecionado] = useState<any>(null);
-  const [progresso, setProgresso] = useState<number>(0);
-  const [status, setStatus] = useState<string>('processando');
-  const [updateCounter, setUpdateCounter] = useState<number>(0);
+  const [darkMode, setDarkMode] = useState(false);
+  const correcaoId = id ? Number(id) : null;
 
-  // Função para renderizar texto com erros grifados
+  const { progressData, error: sseError, isConnected } = useSSEProgress(correcaoId);
+  const [correcaoCompleta, setCorrecaoCompleta] = useState<ExtendedEssayCorrection | null>(null);
+  const [mostrarCorrecao, setMostrarCorrecao] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [erroSelecionado, setErroSelecionado] = useState<any>(null);
+  const [progresso, setProgresso] = useState(0);
+  const [status, setStatus] = useState('processando');
+  const [viewMode, setViewMode] = useState<'overview' | 'detailed'>('overview');
+
+  const statusNormalizado = (status || '').toLowerCase();
+  const isConcluida = statusNormalizado.includes('conclu');
+  const isProcessando = statusNormalizado.includes('process');
+  const isErro = statusNormalizado.includes('erro');
+
   const renderTextoComErros = (texto: string, erros: any[]) => {
     if (!texto) {
       return <p className="text-gray-400 italic">Texto não disponível</p>;
     }
 
     if (!erros || erros.length === 0) {
-      // Quebrar em parágrafos quando não há erros
-      const paragrafos = texto.split('\n').filter(p => p.trim());
+      const paragrafos = texto.split('\n').filter((p) => p.trim());
       return (
         <>
           {paragrafos.map((paragrafo, idx) => (
-            <p key={idx} className="mb-1 indent-8 leading-snug">
+            <p key={idx} className="mb-3 indent-8 leading-snug">
               {paragrafo.trim()}
             </p>
           ))}
@@ -41,78 +59,120 @@ export default function RedacaoCorrecaoView() {
       );
     }
 
-    // Ordenar erros por posição
-    const errosOrdenados = [...erros].sort((a, b) => a.posicaoInicio - b.posicaoInicio);
-    
-    // Dividir texto em parágrafos primeiro
-    const paragrafos = texto.split('\n').filter(p => p.trim());
-    
-    return (
-      <>
-        {paragrafos.map((paragrafo, pIdx) => {
-          // Calcular offset deste parágrafo no texto completo
-          let offset = 0;
-          for (let i = 0; i < pIdx; i++) {
-            offset += paragrafos[i].length + 1; // +1 para o \n
+    const ocorrencias: Array<{ inicio: number; fim: number; erro: any }> = [];
+    const textoLower = texto.toLowerCase();
+
+    erros.forEach((erro) => {
+      const trecho = (erro?.textoOriginal || '').trim();
+      if (!trecho) return;
+
+      const trechoLower = trecho.toLowerCase();
+      let indice = textoLower.indexOf(trechoLower);
+
+      while (indice !== -1) {
+        ocorrencias.push({ inicio: indice, fim: indice + trecho.length, erro });
+        indice = textoLower.indexOf(trechoLower, indice + trecho.length);
+      }
+    });
+
+    ocorrencias.sort((a, b) => a.inicio - b.inicio);
+
+    const filtradas: typeof ocorrencias = [];
+    let ultimoFim = -1;
+    ocorrencias.forEach((item) => {
+      if (item.inicio >= ultimoFim) {
+        filtradas.push(item);
+        ultimoFim = item.fim;
+      }
+    });
+
+    const segmentos: JSX.Element[] = [];
+    let cursor = 0;
+
+    filtradas.forEach((item, idx) => {
+      if (item.inicio > cursor) {
+        segmentos.push(
+          <span key={`txt-${idx}-${cursor}`}>
+            {texto.substring(cursor, item.inicio)}
+          </span>
+        );
+      }
+
+      const severidade = (item.erro?.severidade || '').toLowerCase();
+      const highlightClass = severidade === 'high'
+        ? 'bg-red-200 border-b-2 border-red-500 hover:bg-red-300'
+        : severidade === 'medium'
+        ? 'bg-yellow-200 border-b-2 border-yellow-500 hover:bg-yellow-300'
+        : 'bg-blue-200 border-b-2 border-blue-500 hover:bg-blue-300';
+
+      segmentos.push(
+        <span
+          key={`erro-${idx}`}
+          className={`${highlightClass} cursor-pointer transition-colors rounded-sm px-0.5`}
+          onClick={() => setErroSelecionado(item.erro)}
+          title="Clique para ver detalhes"
+        >
+          {texto.substring(item.inicio, item.fim)}
+        </span>
+      );
+
+      cursor = item.fim;
+    });
+
+    if (cursor < texto.length) {
+      segmentos.push(
+        <span key="txt-final">
+          {texto.substring(cursor)}
+        </span>
+      );
+    }
+
+    const paragrafos: JSX.Element[] = [];
+    let buffer: JSX.Element[] = [];
+    let paragIdx = 0;
+
+    const flushParagrafo = () => {
+      if (buffer.length === 0) {
+        paragrafos.push(
+          <p key={`p-${paragIdx++}`} className="mb-3 indent-8 leading-snug">
+            &nbsp;
+          </p>
+        );
+        return;
+      }
+
+      paragrafos.push(
+        <p key={`p-${paragIdx++}`} className="mb-3 indent-8 leading-snug">
+          {buffer}
+        </p>
+      );
+      buffer = [];
+    };
+
+    segmentos.forEach((segmento, idx) => {
+      const conteudo = segmento.props.children;
+
+      if (typeof conteudo === 'string' && conteudo.includes('\n')) {
+        const partes = conteudo.split('\n');
+        partes.forEach((parte, parteIdx) => {
+          if (parteIdx > 0) {
+            flushParagrafo();
           }
-          
-          const inicioParagrafo = offset;
-          const fimParagrafo = offset + paragrafo.length;
-          
-          // Filtrar erros que estão neste parágrafo
-          const errosDoParagrafo = errosOrdenados.filter(
-            erro => erro.posicaoInicio >= inicioParagrafo && erro.posicaoInicio < fimParagrafo
-          );
-          
-          const elementos: JSX.Element[] = [];
-          let ultimaPosicao = inicioParagrafo;
 
-          errosDoParagrafo.forEach((erro, idx) => {
-            // Texto antes do erro
-            if (erro.posicaoInicio > ultimaPosicao) {
-              elementos.push(
-                <span key={`texto-${pIdx}-${idx}`}>
-                  {texto.substring(ultimaPosicao, erro.posicaoInicio)}
-                </span>
-              );
-            }
-
-            // Texto com erro (grifado)
-            const corErro = erro.severidade === 'high' ? 'bg-red-200 border-b-2 border-red-500 hover:bg-red-300' :
-                            erro.severidade === 'medium' ? 'bg-yellow-200 border-b-2 border-yellow-500 hover:bg-yellow-300' :
-                            'bg-blue-200 border-b-2 border-blue-500 hover:bg-blue-300';
-            
-            elementos.push(
-              <span
-                key={`erro-${pIdx}-${idx}`}
-                className={`${corErro} cursor-pointer transition-all rounded-sm px-0.5`}
-                onClick={() => setErroSelecionado(erro)}
-                title="Clique para ver detalhes"
-              >
-                {texto.substring(erro.posicaoInicio, erro.posicaoFim)}
-              </span>
-            );
-
-            ultimaPosicao = erro.posicaoFim;
-          });
-
-          // Texto após o último erro do parágrafo
-          if (ultimaPosicao < fimParagrafo) {
-            elementos.push(
-              <span key={`texto-final-${pIdx}`}>
-                {texto.substring(ultimaPosicao, fimParagrafo)}
-              </span>
-            );
+          if (parte.length) {
+            buffer.push(<span key={`seg-${idx}-${parteIdx}`}>{parte}</span>);
           }
+        });
+      } else {
+        buffer.push(segmento);
+      }
+    });
 
-          return (
-            <p key={pIdx} className="mb-3 indent-8 leading-snug">
-              {elementos.length > 0 ? elementos : paragrafo.trim()}
-            </p>
-          );
-        })}
-      </>
-    );
+    if (buffer.length) {
+      flushParagrafo();
+    }
+
+    return <>{paragrafos}</>;
   };
 
   useEffect(() => {
@@ -125,33 +185,27 @@ export default function RedacaoCorrecaoView() {
   }, [navigate]);
 
   useEffect(() => {
-    if (progressData) {
-      console.log('📊 [COMPONENTE] Progresso recebido do hook:', {
-        progresso: progressData.progresso,
-        status: progressData.status
-      });
-      
-      setProgresso(progressData.progresso);
-      setStatus(progressData.status);
-      setIsLoading(false);
-      setUpdateCounter(prev => prev + 1); // Forçar re-render
+    if (!progressData) {
+      return;
+    }
 
-      // Carregar correção completa automaticamente quando concluída
-      if (progressData.status === 'concluída' && correcaoId && !correcaoCompleta) {
-        console.log('✅ Correção concluída, carregando dados completos...');
-        loadCorrecaoCompleta(correcaoId);
-      }
+    setProgresso(progressData.progresso);
+    setStatus(progressData.status);
+    setIsLoading(false);
+
+    const statusLower = (progressData.status || '').toLowerCase();
+    if (statusLower.includes('conclu') && correcaoId && !correcaoCompleta) {
+      loadCorrecaoCompleta(correcaoId);
     }
   }, [progressData, correcaoId, correcaoCompleta]);
 
   const loadCorrecaoCompleta = async (id: number) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/RedacaoCorrecao/${id}`);
-      const data = await response.json();
-      console.log('📥 [CORREÇÃO COMPLETA] Dados recebidos:', data);
-      console.log('📥 [FEEDBACKS]', data.feedbacks);
+      const response = await fetch(`${API_URL}/RedacaoCorrecao/${id}`);
+      const data: ExtendedEssayCorrection = await response.json();
       setCorrecaoCompleta(data);
       setMostrarCorrecao(true);
+      setViewMode('overview');
     } catch (error) {
       console.error('Erro ao carregar correção:', error);
     }
@@ -163,195 +217,622 @@ export default function RedacaoCorrecaoView() {
   };
 
   const handleUpdateUser = (updatedData: Partial<User>) => {
-    const updatedUser = { ...user, ...updatedData } as User;
+    const updatedUser = { ...(user as User), ...updatedData } as User;
     setUser(updatedUser);
     localStorage.setItem('user', JSON.stringify(updatedUser));
+  };
+
+  const getNavButtonClasses = (isActive = false) => {
+    const base = 'w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors';
+    const active = 'bg-blue-600 text-white';
+    const inactive = darkMode
+      ? 'text-slate-400 hover:bg-slate-800 hover:text-white'
+      : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900';
+    return `${base} ${isActive ? active : inactive}`;
+  };
+
+  const competencias = correcaoCompleta?.competencias ?? [];
+  const sortedCompetencias = useMemo(() => {
+    if (!competencias.length) {
+      return [] as CompetencyScore[];
+    }
+    return [...competencias].sort((a, b) => b.nota - a.nota);
+  }, [competencias]);
+
+  const bestCompetencia = sortedCompetencias[0];
+  const weakestCompetencia = sortedCompetencias[sortedCompetencias.length - 1];
+  const pontosPositivos = correcaoCompleta?.feedbacks?.pontosPositivos ?? [];
+  const pontosMelhoria = correcaoCompleta?.feedbacks?.pontosMelhoria ?? [];
+  const recomendacoes = correcaoCompleta?.feedbacks?.recomendacoes ?? [];
+  const notaTotal = correcaoCompleta?.notaTotal ?? 0;
+  const dataCorrecaoIso = (correcaoCompleta as any)?.dataCorrecao
+    ?? (correcaoCompleta as any)?.dataConclusao
+    ?? (correcaoCompleta as any)?.dataCriacao;
+  const dataCorrecaoFormatada = dataCorrecaoIso
+    ? new Date(dataCorrecaoIso).toLocaleDateString('pt-BR', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric'
+      })
+    : 'Correção recente';
+  const nivelAluno = notaTotal >= 800 ? 'Avançado' : notaTotal >= 600 ? 'Intermediário' : 'Em desenvolvimento';
+
+  const overviewHighlights = useMemo(() => {
+    const highlights: Array<{ title: string; label: string; description: string; tone: HighlightTone; icon: string }> = [
+      {
+        title: 'Ponto Forte',
+        label: bestCompetencia?.nomeCompetencia || 'Estrutura sintática',
+        description:
+          bestCompetencia?.comentario ||
+          pontosPositivos[0] ||
+          'Assim que finalizarmos a correção você vê os destaques aqui.',
+        tone: 'success',
+        icon: '🛡️'
+      },
+      {
+        title: 'Progressão',
+        label: notaTotal >= 800 ? 'Tese consistente' : notaTotal >= 600 ? 'Boa evolução' : 'Em construção',
+        description:
+          correcaoCompleta?.resumoFinal ||
+          pontosPositivos[1] ||
+          'Use o diagnóstico executivo para acompanhar sua jornada.',
+        tone: 'neutral',
+        icon: '📈'
+      },
+      {
+        title: 'Atenção crítica',
+        label: weakestCompetencia?.nomeCompetencia || 'Intervenção (Comp. 5)',
+        description:
+          pontosMelhoria[0] ||
+          weakestCompetencia?.comentario ||
+          'Nenhum alerta crítico nesta correção.',
+        tone: 'warning',
+        icon: '⚠️'
+      }
+    ];
+    return highlights;
+  }, [bestCompetencia, weakestCompetencia, pontosPositivos, pontosMelhoria, notaTotal, correcaoCompleta]);
+
+  const getToneClasses = (tone: HighlightTone) => {
+    switch (tone) {
+      case 'success':
+        return {
+          icon: darkMode
+            ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-400/40'
+            : 'bg-emerald-50 text-emerald-600 border border-emerald-100',
+          label: darkMode ? 'text-emerald-200' : 'text-emerald-700'
+        };
+      case 'warning':
+        return {
+          icon: darkMode
+            ? 'bg-amber-500/10 text-amber-200 border border-amber-400/40'
+            : 'bg-amber-50 text-amber-600 border border-amber-100',
+          label: darkMode ? 'text-amber-200' : 'text-amber-700'
+        };
+      default:
+        return {
+          icon: darkMode
+            ? 'bg-blue-500/10 text-blue-200 border border-blue-400/40'
+            : 'bg-blue-50 text-blue-600 border border-blue-100',
+          label: darkMode ? 'text-blue-200' : 'text-blue-700'
+        };
+    }
+  };
+
+  const getCompetenciaStyles = (nota: number) => {
+    if (nota >= 160) {
+      return {
+        tag: darkMode
+          ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-400/40'
+          : 'bg-emerald-50 text-emerald-600 border border-emerald-100',
+        bar: 'from-emerald-400 to-emerald-500',
+        label: 'Bom domínio'
+      };
+    }
+    if (nota >= 120) {
+      return {
+        tag: darkMode
+          ? 'bg-blue-500/10 text-blue-200 border border-blue-400/40'
+          : 'bg-blue-50 text-blue-600 border border-blue-100',
+        bar: 'from-blue-500 to-cyan-500',
+        label: 'Consistente'
+      };
+    }
+    if (nota >= 80) {
+      return {
+        tag: darkMode
+          ? 'bg-amber-500/10 text-amber-200 border border-amber-400/40'
+          : 'bg-amber-50 text-amber-600 border border-amber-100',
+        bar: 'from-amber-500 to-orange-500',
+        label: 'Em desenvolvimento'
+      };
+    }
+    return {
+      tag: darkMode
+        ? 'bg-rose-500/10 text-rose-200 border border-rose-400/40'
+        : 'bg-rose-50 text-rose-600 border border-rose-100',
+      bar: 'from-rose-500 to-orange-500',
+      label: 'Prioritário'
+    };
+  };
+
+  const renderOverviewSection = () => {
+    if (!correcaoCompleta) {
+      return null;
+    }
+
+    return (
+      <div className="space-y-6">
+        <div className={`rounded-3xl border shadow-2xl ${darkMode ? 'bg-gradient-to-r from-slate-900 to-slate-800 border-slate-700' : 'bg-white border-slate-200'} p-8`}>
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <div className="flex items-center gap-3 text-sm uppercase tracking-[0.3em] font-semibold">
+                <span className={darkMode ? 'text-blue-300' : 'text-blue-600'}>Diagnóstico executivo</span>
+                <span className={darkMode ? 'text-slate-500' : 'text-slate-500'}>{dataCorrecaoFormatada}</span>
+              </div>
+              <h2 className={`mt-3 text-3xl lg:text-4xl font-black leading-tight ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                {correcaoCompleta.tema}
+              </h2>
+              <p className={`mt-3 text-base ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+                Revise seus principais indicadores antes de mergulhar nas correções linha a linha.
+              </p>
+            </div>
+            <div className={`rounded-2xl p-6 text-center border ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
+              <p className={`text-sm font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Nota Geral</p>
+              <div className={`text-6xl font-black ${notaTotal >= 800 ? 'text-green-500' : notaTotal >= 600 ? 'text-yellow-500' : 'text-orange-500'}`}>
+                {notaTotal}
+              </div>
+              <p className={`mt-1 text-xs tracking-widest ${darkMode ? 'text-slate-500' : 'text-slate-500'}`}>/ 1000 pontos</p>
+              <p className={`mt-3 text-sm font-semibold ${darkMode ? 'text-blue-200' : 'text-blue-700'}`}>{nivelAluno}</p>
+            </div>
+          </div>
+
+          <div className="mt-8 flex flex-wrap gap-3">
+            <button
+              className={`px-4 py-2 rounded-full text-sm font-semibold ${darkMode ? 'bg-blue-500/20 text-blue-200 border border-blue-400/40' : 'bg-blue-50 text-blue-700 border border-blue-100'}`}
+              type="button"
+            >
+              Diagnóstico Executivo
+            </button>
+            <button
+              onClick={() => setViewMode('detailed')}
+              className={`px-4 py-2 rounded-full text-sm font-semibold border ${darkMode ? 'border-slate-600 text-white hover:bg-slate-800' : 'border-slate-200 text-slate-800 hover:bg-slate-50'}`}
+              type="button"
+            >
+              Ver redação completa
+            </button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {overviewHighlights.map((highlight, idx) => {
+            const tone = getToneClasses(highlight.tone);
+            return (
+              <div key={idx} className={`rounded-2xl border p-5 ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'} flex flex-col gap-3`}>
+                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-xl ${tone.icon}`}>
+                  {highlight.icon}
+                </div>
+                <span className={`text-xs font-bold uppercase tracking-widest ${darkMode ? 'text-slate-500' : 'text-slate-500'}`}>{highlight.title}</span>
+                <h4 className={`text-lg font-semibold ${tone.label}`}>{highlight.label}</h4>
+                <p className={`${darkMode ? 'text-slate-300' : 'text-slate-600'} text-sm`}>{highlight.description}</p>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className={`rounded-3xl border ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'} p-6`}>
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <p className={`text-xs uppercase tracking-[0.4em] font-semibold ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Visão geral</p>
+              <h3 className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>Competências avaliadas</h3>
+            </div>
+            <button
+              onClick={() => setViewMode('detailed')}
+              className="text-sm font-semibold text-blue-500 hover:text-blue-400"
+            >
+              Ver detalhes completos →
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-5 gap-4">
+            {competencias.map((comp, idx) => {
+              const styles = getCompetenciaStyles(comp.nota);
+              return (
+                <div key={idx} className={`rounded-2xl border p-4 flex flex-col gap-3 ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-100'}`}>
+                  <div className="flex items-center justify-between">
+                    <span className={`text-xs font-bold uppercase tracking-widest ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                      Competência {idx + 1}
+                    </span>
+                    <span className={`text-xs px-2 py-1 rounded-full border ${styles.tag}`}>{styles.label}</span>
+                  </div>
+                  <div>
+                    <p className={`text-sm font-semibold ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>{comp.nomeCompetencia}</p>
+                    <div className="mt-2 flex items-baseline gap-1">
+                      <span className="text-3xl font-black text-blue-500">{comp.nota}</span>
+                      <span className={`text-sm ${darkMode ? 'text-slate-500' : 'text-slate-500'}`}>/200</span>
+                    </div>
+                    <div className="mt-3 w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+                      <div className={`h-full bg-gradient-to-r ${styles.bar}`} style={{ width: `${(comp.nota / 200) * 100}%` }} />
+                    </div>
+                  </div>
+                  <p className={`text-xs leading-relaxed ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>{comp.comentario}</p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+      </div>
+    );
+  };
+
+  const renderDetailedSection = () => {
+    if (!correcaoCompleta) {
+      return null;
+    }
+
+    const wordCount = correcaoCompleta.textoRedacao?.split(/\s+/).filter(Boolean).length ?? 0;
+    const statusBadge = notaTotal >= 800
+      ? {
+          label: 'APROVADO',
+          light: 'bg-emerald-50 border border-emerald-200 text-emerald-700',
+          dark: 'bg-emerald-500/10 border border-emerald-400/40 text-emerald-200'
+        }
+      : notaTotal >= 600
+      ? {
+          label: 'EM REVISÃO',
+          light: 'bg-amber-50 border border-amber-200 text-amber-700',
+          dark: 'bg-amber-500/10 border border-amber-400/40 text-amber-200'
+        }
+      : {
+          label: 'REFAZER',
+          light: 'bg-rose-50 border border-rose-200 text-rose-700',
+          dark: 'bg-rose-500/10 border border-rose-400/40 text-rose-200'
+        };
+
+    const getAccent = (nota: number) => {
+      if (nota >= 160) {
+        return {
+          gradient: 'bg-gradient-to-t from-emerald-400 to-emerald-500',
+          card: darkMode ? 'bg-emerald-500/5 border-emerald-400/40' : 'bg-emerald-50 border-emerald-100',
+          text: darkMode ? 'text-emerald-200' : 'text-emerald-700'
+        };
+      }
+      if (nota >= 120) {
+        return {
+          gradient: 'bg-gradient-to-t from-blue-500 to-cyan-500',
+          card: darkMode ? 'bg-blue-500/5 border-blue-400/40' : 'bg-blue-50 border-blue-100',
+          text: darkMode ? 'text-blue-200' : 'text-blue-700'
+        };
+      }
+      if (nota >= 80) {
+        return {
+          gradient: 'bg-gradient-to-t from-amber-500 to-orange-400',
+          card: darkMode ? 'bg-amber-500/5 border-amber-400/40' : 'bg-amber-50 border-amber-100',
+          text: darkMode ? 'text-amber-200' : 'text-amber-700'
+        };
+      }
+      return {
+        gradient: 'bg-gradient-to-t from-rose-500 to-orange-500',
+        card: darkMode ? 'bg-rose-500/5 border-rose-400/40' : 'bg-rose-50 border-rose-100',
+        text: darkMode ? 'text-rose-200' : 'text-rose-700'
+      };
+    };
+
+    const badgeClasses = `${darkMode ? statusBadge.dark : statusBadge.light} px-4 py-1 rounded-full text-[0.7rem] font-black tracking-[0.3em]`;
+
+    return (
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)] gap-6">
+        <div className="space-y-6">
+          <div className={`rounded-3xl border p-8 ${darkMode ? 'bg-slate-900/80 border-slate-700' : 'bg-white border-slate-200 shadow-xl'}`}>
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <div className={`flex items-center gap-2 text-xs font-semibold ${darkMode ? 'text-slate-500' : 'text-slate-500'}`}>
+                  <button onClick={() => navigate('/aluno/estudos')} className="hover:text-blue-500 transition-colors">
+                    Dashboard
+                  </button>
+                  <span className="opacity-40">/</span>
+                  <button onClick={() => navigate('/aluno/redacao/historico')} className="hover:text-blue-500 transition-colors">
+                    Redações
+                  </button>
+                  <span className="opacity-40">/</span>
+                  <span className="text-blue-500">Correção</span>
+                </div>
+                <h2 className={`mt-3 text-3xl font-black tracking-tight ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                  {correcaoCompleta.tema}
+                </h2>
+                <p className={`mt-2 text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                  {correcaoCompleta.tipoAvaliacao || 'ENEM'} · {nivelAluno}
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  onClick={() => setViewMode('overview')}
+                  className={`px-4 py-2 rounded-xl text-sm font-semibold border ${darkMode ? 'border-slate-600 text-slate-200 hover:bg-slate-800' : 'border-slate-200 text-slate-700 hover:bg-slate-50'}`}
+                >
+                  ← Voltar ao diagnóstico
+                </button>
+                <button
+                  onClick={() => window.print()}
+                  className="px-4 py-2 rounded-xl text-sm font-semibold bg-blue-600 text-white hover:bg-blue-700 shadow-lg"
+                >
+                  ⬇️ Download PDF
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-6 flex flex-wrap gap-4 text-sm">
+              <div className={`flex items-center gap-2 px-4 py-2 rounded-full border ${darkMode ? 'border-slate-700 text-slate-200' : 'border-slate-200 text-slate-600'}`}>
+                <span>🗓️</span>
+                {dataCorrecaoFormatada}
+              </div>
+              <div className={`flex items-center gap-2 px-4 py-2 rounded-full border ${darkMode ? 'border-slate-700 text-slate-200' : 'border-slate-200 text-slate-600'}`}>
+                <span>📝</span>
+                {wordCount} palavras
+              </div>
+              <div className={badgeClasses}>{statusBadge.label}</div>
+            </div>
+          </div>
+
+          <div className={`rounded-3xl border p-8 space-y-8 ${darkMode ? 'bg-slate-900/70 border-slate-700' : 'bg-white border-slate-200 shadow-xl'}`}>
+            <div className="flex items-center justify-between">
+              <p className={`text-sm font-semibold tracking-[0.3em] uppercase ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Redação</p>
+              <div className="flex items-center gap-3 text-xs text-black">
+                <span className="flex items-center gap-1"><span className="w-3 h-3 bg-red-300 border border-red-500 rounded" />Erro/Desvio</span>
+                <span className="flex items-center gap-1"><span className="w-3 h-3 bg-yellow-200 border border-yellow-500 rounded" />Atenção</span>
+                <span className="flex items-center gap-1"><span className="w-3 h-3 bg-blue-200 border border-blue-500 rounded" />Sugestão</span>
+              </div>
+            </div>
+
+            <div className={`text-lg leading-relaxed font-serif ${darkMode ? 'text-slate-100' : 'text-slate-900'} space-y-5`}>
+              {renderTextoComErros(correcaoCompleta.textoRedacao ?? '', correcaoCompleta.errosGramaticais || [])}
+            </div>
+
+            <div className={`rounded-2xl border p-5 ${darkMode ? 'bg-slate-800 border-slate-600' : 'bg-slate-50 border-slate-200'}`}>
+              <div className="flex items-center justify-between">
+                <h4 className={`text-base font-bold ${darkMode ? 'text-blue-200' : 'text-blue-900'}`}>📌 Comentário ativo</h4>
+                {erroSelecionado && (
+                  <button
+                    onClick={() => setErroSelecionado(null)}
+                    className={`text-xs font-semibold ${darkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-800'}`}
+                  >
+                    Limpar
+                  </button>
+                )}
+              </div>
+              {erroSelecionado ? (
+                <div className="mt-4 space-y-3 text-sm">
+                  <div className={`p-4 rounded-xl border ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
+                    <p className={`text-xs font-bold uppercase tracking-widest ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Trecho destacado</p>
+                    <p className={`mt-2 font-mono ${darkMode ? 'text-white' : 'text-slate-900'}`}>{erroSelecionado.textoOriginal}</p>
+                  </div>
+                  {erroSelecionado.textoSugerido && (
+                    <div className={`p-4 rounded-xl border ${darkMode ? 'bg-emerald-500/5 border-emerald-400/40' : 'bg-emerald-50 border-emerald-200'}`}>
+                      <p className={`text-xs font-bold uppercase tracking-widest ${darkMode ? 'text-emerald-200' : 'text-emerald-700'}`}>Sugestão</p>
+                      <p className={`mt-2 font-mono ${darkMode ? 'text-white' : 'text-slate-900'}`}>{erroSelecionado.textoSugerido}</p>
+                    </div>
+                  )}
+                  <p className={`text-sm leading-relaxed ${darkMode ? 'text-slate-200' : 'text-slate-700'}`}>{erroSelecionado.explicacao}</p>
+                </div>
+              ) : (
+                <p className={`mt-4 text-sm italic ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                  Clique em qualquer destaque para ver explicações detalhadas.
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className={`rounded-3xl border p-6 space-y-5 ${darkMode ? 'bg-slate-900/70 border-slate-700' : 'bg-white border-slate-200 shadow-xl'}`}>
+            <h3 className={`text-base font-bold uppercase tracking-[0.4em] ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Feedback personalizado</h3>
+            <div>
+              <p className={`text-xs font-semibold text-emerald-500 mb-2`}>Pontos fortes</p>
+              {pontosPositivos.length ? (
+                <ul className={`space-y-2 text-sm ${darkMode ? 'text-slate-200' : 'text-slate-700'}`}>
+                  {pontosPositivos.map((item, idx) => (
+                    <li key={`positivo-detailed-${idx}`} className="flex gap-2">
+                      <span className="text-emerald-400">•</span>
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className={`text-xs italic ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Sem destaques registrados.</p>
+              )}
+            </div>
+            <div>
+              <p className={`text-xs font-semibold text-amber-500 mb-2`}>Pontos de atenção</p>
+              {pontosMelhoria.length ? (
+                <ul className={`space-y-2 text-sm ${darkMode ? 'text-slate-200' : 'text-slate-700'}`}>
+                  {pontosMelhoria.map((item, idx) => (
+                    <li key={`melhoria-detailed-${idx}`} className="flex gap-2">
+                      <span className="text-amber-400">•</span>
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className={`text-xs italic ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Nenhum alerta crítico.</p>
+              )}
+            </div>
+            {recomendacoes.length > 0 && (
+              <div>
+                <p className={`text-xs font-semibold text-blue-500 mb-2`}>Próximos passos sugeridos</p>
+                <ul className={`space-y-2 text-sm ${darkMode ? 'text-slate-200' : 'text-slate-700'}`}>
+                  {recomendacoes.map((rec, idx) => (
+                    <li key={`rec-detailed-${idx}`}>
+                      <span className="font-semibold text-blue-500">{idx + 1}.</span> {rec}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            <button
+              onClick={() => navigate('/aluno/redacao/historico')}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-2xl transition-colors"
+            >
+              Voltar ao histórico
+            </button>
+          </div>
+        </div>
+
+        <div className="space-y-6">
+          <div className={`rounded-3xl border p-6 space-y-6 ${darkMode ? 'bg-slate-900/80 border-slate-700' : 'bg-white border-slate-200 shadow-xl'}`}>
+            <div className="flex items-start justify-between">
+              <div>
+                <p className={`text-xs font-semibold uppercase tracking-[0.4em] ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Nota geral</p>
+                <p className={`mt-2 text-5xl font-black ${notaTotal >= 800 ? 'text-emerald-500' : notaTotal >= 600 ? 'text-amber-500' : 'text-rose-500'}`}>{notaTotal}</p>
+                <p className={`text-xs mt-1 ${darkMode ? 'text-slate-500' : 'text-slate-500'}`}>de 1000 pontos</p>
+              </div>
+              <span className={`${badgeClasses} shrink-0`}>{statusBadge.label}</span>
+            </div>
+            <div className="grid grid-cols-5 gap-3">
+              {competencias.map((comp, idx) => {
+                const accent = getAccent(comp.nota);
+                return (
+                  <div key={idx} className="text-center space-y-2">
+                    <p className={`text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>C{idx + 1}</p>
+                    <div className={`h-28 rounded-2xl border flex flex-col justify-end overflow-hidden ${darkMode ? 'border-slate-700 bg-slate-900' : 'border-slate-100 bg-slate-50'}`}>
+                      <div className={`${accent.gradient} w-full`} style={{ height: `${Math.max(8, (comp.nota / 200) * 100)}%` }} />
+                    </div>
+                    <p className={`text-sm font-bold ${accent.text}`}>{comp.nota}</p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className={`rounded-3xl border p-6 ${darkMode ? 'bg-slate-900/70 border-slate-700' : 'bg-white border-slate-200 shadow-xl'}`}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className={`text-base font-bold uppercase tracking-[0.4em] ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Análise detalhada</h3>
+              <button
+                onClick={() => setViewMode('overview')}
+                className={`text-xs font-semibold ${darkMode ? 'text-blue-200 hover:text-blue-100' : 'text-blue-600 hover:text-blue-500'}`}
+              >
+                Ver visão geral →
+              </button>
+            </div>
+            <div className="space-y-4">
+              {competencias.map((comp, idx) => {
+                const accent = getAccent(comp.nota);
+                return (
+                  <div key={idx} className={`rounded-2xl border-l-4 p-4 ${accent.card}`}>
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className={`text-xs font-bold uppercase tracking-[0.3em] ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                          Competência {idx + 1}
+                        </p>
+                        <h4 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-slate-900'}`}>{comp.nomeCompetencia}</h4>
+                      </div>
+                      <p className={`text-2xl font-black ${accent.text}`}>{comp.nota}/200</p>
+                    </div>
+                    <p className={`mt-3 text-sm ${darkMode ? 'text-slate-200' : 'text-slate-700'}`}>{comp.comentario}</p>
+                    {comp.melhorias?.length ? (
+                      <ul className={`mt-3 text-xs space-y-1 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+                        {comp.melhorias.map((melhoria, i) => (
+                          <li key={i}>• {melhoria}</li>
+                        ))}
+                      </ul>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   if (!user) {
     return null;
   }
 
-  console.log('🔄 [RENDER] Progresso:', progresso, 'Status:', status, 'Update#:', updateCounter);
-
   return (
-    <div className={`min-h-screen transition-colors duration-300 ${darkMode
-        ? 'bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900'
-        : 'bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200'
-      }`}>
-      {/* Sidebar */}
-      <div className={`fixed left-0 top-0 h-screen w-52 border-r transition-colors duration-300 flex flex-col ${darkMode
-          ? 'bg-slate-900/50 border-slate-700/50'
-          : 'bg-white border-slate-200'
-        }`}>
-        <div className="p-6 flex-shrink-0">
-          <div className="flex items-center gap-2 mb-8">
-            <h1 className="text-xl font-bold text-blue-600">IEDUCA</h1>
-          </div>
-
-          <nav className="space-y-2">
-            <button 
-              onClick={() => navigate('/aluno/estudos')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors ${darkMode
-                  ? 'text-slate-400 hover:bg-slate-800 hover:text-white'
-                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-                }`}>
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-              </svg>
-              Dashboard
-            </button>
-
-            <button 
-              onClick={() => navigate('/aluno/redacao/historico')}
-              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-blue-600 text-white font-medium transition-colors">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-              </svg>
-              Redações
-            </button>
-          </nav>
-        </div>
-
-        <div className="mt-auto p-6 flex-shrink-0">
-          <button
-            onClick={() => setDarkMode(!darkMode)}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors border-2 ${darkMode
-                ? 'text-slate-400 hover:bg-slate-800 hover:text-white border-slate-700'
-                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 border-slate-300'
-              }`}
-          >
-            <span className="text-xl">{darkMode ? '🌙' : '☀️'}</span>
-            Alternar Tema
-          </button>
-        </div>
-      </div>
+    <div className={`min-h-screen transition-colors duration-300 ${darkMode ? 'bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900' : 'bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200'}`}>
+      <AlunoSidebar darkMode={darkMode} onToggleTheme={() => setDarkMode(!darkMode)} />
 
       <div className="ml-52 min-h-screen flex flex-col">
-        {/* Header */}
-        <div className={`backdrop-blur-sm px-6 py-4 border-b flex justify-between items-center sticky top-0 z-40 transition-colors duration-300 ${darkMode
-            ? 'bg-slate-800/80 border-slate-700/50'
-            : 'bg-white/90 border-slate-200 shadow-sm'
-          }`}>
+        <div className={`backdrop-blur-sm px-6 py-4 border-b flex justify-between items-center sticky top-0 z-40 transition-colors duration-300 ${darkMode ? 'bg-slate-800/80 border-slate-700/50' : 'bg-white/90 border-slate-200 shadow-sm'}`}>
           <div>
-            <h1 className={`text-xl font-bold mb-1 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-              📊 Correção de Redação
-            </h1>
+            <h1 className={`text-xl font-bold mb-1 ${darkMode ? 'text-white' : 'text-slate-900'}`}>📊 Correção de Redação</h1>
             <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-              {status === 'processando' ? 'Aguarde enquanto processamos sua redação...' : 'Correção concluída!'}
+              {isProcessando ? 'Aguarde enquanto processamos sua redação...' : 'Correção concluída!'}
             </p>
           </div>
           <div className="flex items-center gap-4">
             <NotificationDropdown darkMode={darkMode} />
-            <ProfileMenu
-              user={user}
-              darkMode={darkMode}
-              onLogout={handleLogout}
-              onUpdateUser={handleUpdateUser}
-            />
+            <ProfileMenu user={user} darkMode={darkMode} onLogout={handleLogout} onUpdateUser={handleUpdateUser} />
           </div>
         </div>
 
-        {/* Content Area */}
         <div className="flex-1 p-6">
-          <div className="max-w-4xl mx-auto">
-            {/* Loading inicial */}
+          <div className="max-w-screen-2xl mx-auto w-full">
             {isLoading && (
-              <div className={`rounded-2xl shadow-lg border p-8 mb-6 ${darkMode
-                  ? 'bg-slate-800 border-slate-700'
-                  : 'bg-white border-slate-200'
-                }`}>
+              <div className={`rounded-2xl shadow-lg border p-8 mb-6 ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
                 <div className="flex items-center justify-between mb-6">
                   <div className="flex items-center gap-3">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
                     <div>
-                      <h2 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                        Carregando Correção...
-                      </h2>
-                      <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                        Conectando ao servidor...
-                      </p>
+                      <h2 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>Carregando correção...</h2>
+                      <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Conectando ao servidor...</p>
                     </div>
                   </div>
                 </div>
-
-                {/* Skeleton do Progress Bar */}
                 <div className="mb-6">
                   <div className="w-full bg-slate-200 rounded-full h-3 overflow-hidden animate-pulse">
-                    <div className="bg-slate-300 h-3 rounded-full w-1/4"></div>
+                    <div className="bg-slate-300 h-3 rounded-full w-1/4" />
                   </div>
                 </div>
-
-                {/* Skeleton dos Steps */}
                 <div className="grid grid-cols-5 gap-4">
                   {[1, 2, 3, 4, 5].map((idx) => (
                     <div key={idx} className="text-center">
-                      <div className={`w-12 h-12 mx-auto rounded-full flex items-center justify-center mb-2 animate-pulse ${
-                        darkMode ? 'bg-slate-700' : 'bg-slate-200'
-                      }`}>
+                      <div className={`w-12 h-12 mx-auto rounded-full flex items-center justify-center mb-2 animate-pulse ${darkMode ? 'bg-slate-700' : 'bg-slate-200'}`}>
                         {idx}
                       </div>
-                      <div className={`h-3 rounded animate-pulse mx-auto ${
-                        darkMode ? 'bg-slate-700' : 'bg-slate-200'
-                      }`} style={{ width: '60px' }}></div>
+                      <div className={`h-3 rounded animate-pulse mx-auto ${darkMode ? 'bg-slate-700' : 'bg-slate-200'}`} style={{ width: '60px' }} />
                     </div>
                   ))}
                 </div>
               </div>
             )}
 
-            {/* Barra de Progresso - Sempre visível até clicar em "Ver Correção" */}
             {!isLoading && !mostrarCorrecao && (
-              <div className={`rounded-2xl shadow-lg border p-8 mb-6 ${darkMode
-                  ? 'bg-slate-800 border-slate-700'
-                  : 'bg-white border-slate-200'
-                }`}>
+              <div className={`rounded-2xl shadow-lg border p-8 mb-6 ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
                 <div className="flex items-center justify-between mb-6">
                   <div className="flex items-center gap-3">
-                    {status === 'processando' ? (
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                    {isProcessando ? (
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
                     ) : (
-                      <div className="h-8 w-8 rounded-full bg-green-500 flex items-center justify-center text-white text-xl">
-                        ✓
-                      </div>
+                      <div className="h-8 w-8 rounded-full bg-green-500 flex items-center justify-center text-white text-xl">✓</div>
                     )}
                     <div>
                       <h2 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                        {status === 'processando' ? 'Processando Redação' : 'Correção Concluída!'}
+                        {isProcessando ? 'Processando redação' : 'Correção concluída!'}
                       </h2>
                       <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                        {status === 'processando' 
-                          ? (isConnected ? '🟢 Conectado ao servidor' : '🔴 Reconectando...')
-                          : '✨ Sua redação foi corrigida com sucesso'}
+                        {isProcessando ? (isConnected ? '🟢 Conectado ao servidor' : '🔴 Reconectando...') : '✨ Sua redação foi corrigida com sucesso'}
                       </p>
                     </div>
                   </div>
-                  <div className={`text-4xl font-bold ${darkMode ? 'text-blue-400' : 'text-blue-600'}`}>
-                    {progresso}%
-                  </div>
+                  <div className={`text-4xl font-bold ${darkMode ? 'text-blue-400' : 'text-blue-600'}`}>{progresso}%</div>
                 </div>
 
-                {/* Progress Bar */}
                 <div className="mb-6">
                   <div className="w-full bg-slate-200 rounded-full h-3 overflow-hidden">
-                    <div 
-                      className={`h-3 rounded-full transition-all duration-500 ease-out ${
-                        status === 'concluída' 
-                          ? 'bg-gradient-to-r from-green-500 to-green-600' 
-                          : 'bg-gradient-to-r from-blue-500 to-blue-600'
-                      }`}
+                    <div
+                      className={`h-3 rounded-full transition-all duration-500 ease-out ${isConcluida ? 'bg-gradient-to-r from-green-500 to-green-600' : 'bg-gradient-to-r from-blue-500 to-blue-600'}`}
                       style={{ width: `${progresso}%` }}
-                    ></div>
+                    />
                   </div>
                 </div>
 
-                {/* Status Steps */}
                 <div className="grid grid-cols-5 gap-4 mb-6">
                   {[
                     { label: 'Iniciando', min: 0, max: 20 },
                     { label: 'Analisando', min: 20, max: 50 },
                     { label: 'Avaliando', min: 50, max: 75 },
-                    { label: 'Gerando Feedback', min: 75, max: 95 },
+                    { label: 'Gerando feedback', min: 75, max: 95 },
                     { label: 'Finalizando', min: 95, max: 100 }
                   ].map((step, idx) => (
                     <div key={idx} className="text-center">
@@ -366,319 +847,40 @@ export default function RedacaoCorrecaoView() {
                       }`}>
                         {progresso >= step.max ? '✓' : idx + 1}
                       </div>
-                      <p className={`text-xs font-medium ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                        {step.label}
-                      </p>
+                      <p className={`text-xs font-medium ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>{step.label}</p>
                     </div>
                   ))}
                 </div>
 
-                {/* Botão para ver correção - aparece quando status === 'concluída' */}
-                {status === 'concluída' && correcaoId && (
+                {isConcluida && correcaoId && (
                   <button
                     onClick={() => loadCorrecaoCompleta(correcaoId)}
                     className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-bold py-4 rounded-xl transition-all transform hover:scale-[1.02] shadow-lg"
                   >
-                    📊 Ver Correção Completa
+                    📊 Ver correção completa
                   </button>
                 )}
 
                 {sseError && (
-                  <div className="mt-4 p-4 bg-red-100 border border-red-300 rounded-lg text-red-800 text-sm">
-                    ⚠️ {sseError}
-                  </div>
+                  <div className="mt-4 p-4 bg-red-100 border border-red-300 rounded-lg text-red-800 text-sm">⚠️ {sseError}</div>
                 )}
               </div>
             )}
 
-            {/* Resultado da Correção - Estilo ENEM */}
-            {mostrarCorrecao && status === 'concluída' && correcaoCompleta && (
-              <div className="space-y-6">
-                {/* Header com Nota */}
-                <div className={`rounded-2xl shadow-lg border p-6 ${darkMode
-                    ? 'bg-slate-800 border-slate-700'
-                    : 'bg-white border-slate-200'
-                  }`}>
-                  <div className="flex items-center justify-between mb-4">
-                    <div>
-                      <h2 className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                        Correção {correcaoCompleta.tipoAvaliacao || 'ENEM'}
-                      </h2>
-                      <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                        {correcaoCompleta.tema}
-                      </p>
-                    </div>
-                    <div className="text-center">
-                      <div className={`text-sm font-bold mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                        NOTA GERAL
-                      </div>
-                      <div className={`text-6xl font-bold ${
-                        correcaoCompleta.notaTotal >= 800 ? 'text-green-500' : 
-                        correcaoCompleta.notaTotal >= 600 ? 'text-yellow-500' : 'text-orange-500'
-                      }`}>
-                        {correcaoCompleta.notaTotal}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Competências em Grid */}
-                  <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
-                    {correcaoCompleta.competencias?.map((comp: any, idx: number) => (
-                      <div key={idx} className={`p-3 rounded-lg border-l-4 ${
-                        comp.nota >= 160 ? 'border-green-500 bg-green-50' :
-                        comp.nota >= 120 ? 'border-yellow-500 bg-yellow-50' :
-                        'border-orange-500 bg-orange-50'
-                      } ${darkMode ? 'bg-opacity-10' : ''}`}>
-                        <div className={`text-xs font-bold mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                          Competência {idx + 1}
-                        </div>
-                        <div className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                          {comp.nota}/200
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Texto da Redação com Erros Grifados */}
-                <div className={`rounded-2xl shadow-lg border p-8 ${darkMode
-                    ? 'bg-slate-800 border-slate-700'
-                    : 'bg-white border-slate-200'
-                  }`}>
-                  <div className="mb-6 border-b pb-4">
-                    <h3 className={`text-2xl font-bold mb-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                      {correcaoCompleta.tema}
-                    </h3>
-                    <div className="flex gap-4 text-sm">
-                      <span className={darkMode ? 'text-slate-400' : 'text-slate-600'}>
-                        📝 Total de palavras: {correcaoCompleta.textoRedacao?.split(/\s+/).length || 0}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    {/* Coluna do Texto - Ocupa 2/3 */}
-                    <div className="lg:col-span-2">
-                      <div className={`prose max-w-none text-justify ${darkMode ? 'prose-invert' : ''}`}>
-                        <div className={`text-base leading-loose font-serif ${darkMode ? 'text-slate-200' : 'text-slate-900'}`}
-                             style={{ textIndent: '2rem', lineHeight: '2' }}>
-                          {renderTextoComErros(correcaoCompleta.textoRedacao, correcaoCompleta.errosGramaticais || [])}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Coluna de Comentários Ativos */}
-                    <div className="space-y-4">
-                      <div className={`sticky top-4 p-4 rounded-lg ${darkMode ? 'bg-blue-900/20' : 'bg-blue-50'}`}>
-                        <h4 className={`font-bold mb-3 text-sm ${darkMode ? 'text-blue-300' : 'text-blue-900'}`}>
-                          📌 COMENTÁRIO ATIVO
-                        </h4>
-                        
-                        {erroSelecionado ? (
-                          <div className="space-y-3">
-                            <div className={`p-3 rounded ${
-                              erroSelecionado.severidade === 'high' ? 'bg-red-100 border border-red-300' :
-                              erroSelecionado.severidade === 'medium' ? 'bg-yellow-100 border border-yellow-300' :
-                              'bg-blue-100 border border-blue-300'
-                            } ${darkMode ? 'bg-opacity-20' : ''}`}>
-                              <div className="text-xs font-bold mb-1 text-red-700">TEXTO ORIGINAL:</div>
-                              <div className="text-sm font-mono">{erroSelecionado.textoOriginal}</div>
-                            </div>
-
-                            {erroSelecionado.textoSugerido && (
-                              <div className={`p-3 rounded bg-green-100 border border-green-300 ${darkMode ? 'bg-opacity-20' : ''}`}>
-                                <div className="text-xs font-bold mb-1 text-green-700">SUGESTÃO:</div>
-                                <div className="text-sm font-mono">{erroSelecionado.textoSugerido}</div>
-                              </div>
-                            )}
-
-                            <div className={`p-3 rounded ${darkMode ? 'bg-slate-700' : 'bg-white'}`}>
-                              <div className="text-xs font-bold mb-1">EXPLICAÇÃO:</div>
-                              <div className="text-sm">{erroSelecionado.explicacao}</div>
-                            </div>
-
-                            <button
-                              onClick={() => setErroSelecionado(null)}
-                              className="w-full text-xs py-2 bg-slate-200 hover:bg-slate-300 rounded transition-colors"
-                            >
-                              Fechar
-                            </button>
-                          </div>
-                        ) : (
-                          <p className={`text-xs italic ${darkMode ? 'text-blue-200' : 'text-blue-800'}`}>
-                            Clique em um trecho destacado para ver o comentário
-                          </p>
-                        )}
-                      </div>
-
-                      {/* Legenda de Cores */}
-                      <div className={`p-4 rounded-lg ${darkMode ? 'bg-slate-700' : 'bg-slate-50'}`}>
-                        <h4 className={`text-xs font-bold mb-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>Legenda:</h4>
-                        <div className="space-y-2 text-xs">
-                          <div className="flex items-center gap-2">
-                            <div className="w-4 h-4 bg-red-200 border-b-2 border-red-500 rounded"></div>
-                            <span className={darkMode ? 'text-slate-200' : 'text-slate-700'}>Erro grave</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <div className="w-4 h-4 bg-yellow-200 border-b-2 border-yellow-500 rounded"></div>
-                            <span className={darkMode ? 'text-slate-200' : 'text-slate-700'}>Erro médio</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <div className="w-4 h-4 bg-blue-200 border-b-2 border-blue-500 rounded"></div>
-                            <span className={darkMode ? 'text-slate-200' : 'text-slate-700'}>Sugestão</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Pontuação por Competência Detalhada */}
-                <div className={`rounded-2xl shadow-lg border p-6 ${darkMode
-                    ? 'bg-slate-800 border-slate-700'
-                    : 'bg-white border-slate-200'
-                  }`}>
-                  <h3 className={`text-xl font-bold mb-4 flex items-center gap-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                    📊 Pontuação por Competência
-                  </h3>
-                  
-                  <div className="space-y-4">
-                    {correcaoCompleta.competencias?.map((comp: any, idx: number) => (
-                      <div key={idx} className={`p-4 rounded-lg ${darkMode ? 'bg-slate-700' : 'bg-slate-50'}`}>
-                        <div className="flex items-center justify-between mb-2">
-                          <div className={`font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                            Competência {idx + 1}: {comp.nomeCompetencia}
-                          </div>
-                          <div className={`text-2xl font-bold ${
-                            comp.nota >= 160 ? 'text-green-500' :
-                            comp.nota >= 120 ? 'text-yellow-500' : 'text-orange-500'
-                          }`}>
-                            {comp.nota}/200
-                          </div>
-                        </div>
-                        
-                        {/* Barra de Progresso */}
-                        <div className="w-full bg-slate-200 rounded-full h-2 mb-3">
-                          <div 
-                            className={`h-2 rounded-full ${
-                              comp.nota >= 160 ? 'bg-green-500' :
-                              comp.nota >= 120 ? 'bg-yellow-500' : 'bg-orange-500'
-                            }`}
-                            style={{ width: `${(comp.nota / 200) * 100}%` }}
-                          />
-                        </div>
-
-                        <p className={`text-sm mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                          {comp.comentario}
-                        </p>
-
-                        {comp.melhorias && comp.melhorias.length > 0 && (
-                          <div className={`mt-2 text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                            <strong>Melhorias sugeridas:</strong>
-                            <ul className="list-disc list-inside mt-1">
-                              {comp.melhorias.map((m: string, i: number) => (
-                                <li key={i}>{m}</li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-              
-                {/* Resumo e Feedbacks */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {/* Resumo Final */}
-                  {correcaoCompleta.resumoFinal && (
-                    <div className={`rounded-2xl shadow-lg border p-6 ${darkMode
-                        ? 'bg-slate-800 border-slate-700'
-                        : 'bg-white border-slate-200'
-                      }`}>
-                      <h3 className={`text-xl font-bold mb-3 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                        💬 Resumo Final
-                      </h3>
-                      <p className={`text-sm ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                        {correcaoCompleta.resumoFinal}
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Pontos Positivos e Melhorias */}
-                  <div className={`rounded-2xl shadow-lg border p-6 ${darkMode
-                        ? 'bg-slate-800 border-slate-700'
-                        : 'bg-white border-slate-200'
-                      }`}>
-                    <h3 className={`text-xl font-bold mb-3 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                      📝 Feedbacks
-                    </h3>
-                    
-                    {correcaoCompleta.feedbacks?.pontosPositivos?.length > 0 ? (
-                      <div className="mb-4">
-                        <h4 className={`font-bold mb-2 text-green-600`}>✅ Pontos Positivos</h4>
-                        <ul className={`text-sm space-y-1 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                          {correcaoCompleta.feedbacks.pontosPositivos.map((p: string, i: number) => (
-                            <li key={i}>• {p}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    ) : (
-                      <div className="mb-4">
-                        <h4 className={`font-bold mb-2 text-slate-500`}>✅ Pontos Positivos</h4>
-                        <p className={`text-sm italic ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                          Nenhum feedback disponível para esta redação.
-                        </p>
-                      </div>
-                    )}
-
-                    {correcaoCompleta.feedbacks?.pontosMelhoria?.length > 0 ? (
-                      <div>
-                        <h4 className={`font-bold mb-2 text-orange-600`}>⚠️ Pontos de Melhoria</h4>
-                        <ul className={`text-sm space-y-1 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                          {correcaoCompleta.feedbacks.pontosMelhoria.map((p: string, i: number) => (
-                            <li key={i}>• {p}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    ) : (
-                      <div>
-                        <h4 className={`font-bold mb-2 text-slate-500`}>⚠️ Pontos de Melhoria</h4>
-                        <p className={`text-sm italic ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                          Nenhum feedback disponível para esta redação.
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => navigate('/aluno/redacao/historico')}
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl transition-colors"
-                >
-                  Voltar ao Histórico
-                </button>
-              </div>
+            {mostrarCorrecao && isConcluida && correcaoCompleta && (
+              viewMode === 'overview' ? renderOverviewSection() : renderDetailedSection()
             )}
 
-            {/* Erro */}
-            {status === 'erro' && (
-              <div className={`rounded-2xl shadow-lg border p-8 text-center ${darkMode
-                  ? 'bg-slate-800 border-slate-700'
-                  : 'bg-white border-slate-200'
-                }`}>
+            {isErro && (
+              <div className={`rounded-2xl shadow-lg border p-8 text-center ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
                 <div className="text-6xl mb-4">⚠️</div>
-                <h2 className={`text-2xl font-bold mb-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                  Erro ao Processar Redação
-                </h2>
-                <p className={`mb-6 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                  Ocorreu um erro durante o processamento. Por favor, tente novamente.
-                </p>
+                <h2 className={`text-2xl font-bold mb-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>Erro ao processar redação</h2>
+                <p className={darkMode ? 'text-slate-400' : 'text-slate-600'}>Ocorreu um erro durante o processamento. Por favor, tente novamente.</p>
                 <button
                   onClick={() => navigate('/aluno/redacao/historico')}
-                  className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                  className="mt-6 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
                 >
-                  Voltar ao Histórico
+                  Voltar ao histórico
                 </button>
               </div>
             )}

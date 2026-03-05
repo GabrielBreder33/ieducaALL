@@ -15,6 +15,6 @@ namespace ServiceIEDUCA.Models
         [Required]
         public string senha { get; set; } = string.Empty;
         [Required]
-        public DateTime data_criacao { get; set; } = DateTime.Now;
+        public DateTime data_criacao { get; set; } = DateTime.UtcNow;
     }
 }

@@ -18,6 +18,39 @@ namespace ServiceIEDUCA.Services
 
         public async Task<UserDto> CreateUserAsync(UserCreateDto userCreateDto)
         {
+            var emailEmUso = await _context.Users
+                .AnyAsync(u => u.Email.ToLower() == userCreateDto.Email.ToLower());
+
+            if (emailEmUso)
+                throw new InvalidOperationException($"O e-mail '{userCreateDto.Email}' já está em uso por outro usuário.");
+
+            // Verifica se o telefone já está em uso (verificação por igualdade e por dígitos, para cobrir formatações)
+            if (!string.IsNullOrWhiteSpace(userCreateDto.Telefone))
+            {
+                var telefoneExatoEmUso = await _context.Users
+                    .AnyAsync(u => u.Telefone == userCreateDto.Telefone);
+
+                if (telefoneExatoEmUso)
+                    throw new InvalidOperationException($"O telefone '{userCreateDto.Telefone}' já está em uso por outro usuário.");
+
+                // Normaliza para somente dígitos e compara com os telefones existentes em memória
+                var novoTelefoneNormalized = new string(userCreateDto.Telefone.Where(char.IsDigit).ToArray());
+                if (!string.IsNullOrEmpty(novoTelefoneNormalized))
+                {
+                    var telefonesExistentes = await _context.Users
+                        .Where(u => u.Telefone != null)
+                        .Select(u => u.Telefone)
+                        .ToListAsync();
+
+                    foreach (var t in telefonesExistentes)
+                    {
+                        var norm = new string(t.Where(char.IsDigit).ToArray());
+                        if (norm == novoTelefoneNormalized)
+                            throw new InvalidOperationException($"O telefone '{userCreateDto.Telefone}' já está em uso por outro usuário.");
+                    }
+                }
+            }
+
             var hashedPassword = HashPassword(userCreateDto.Senha);
 
             var user = new User
@@ -28,7 +61,7 @@ namespace ServiceIEDUCA.Services
                 Role = userCreateDto.Role,
                 Ativo = userCreateDto.Ativo,
                 Senha = hashedPassword,
-                DataCriacao = DateTime.Now,
+                DataCriacao = DateTime.UtcNow,
                 id_Escola = userCreateDto.IdEscola
             };
 
@@ -69,8 +102,51 @@ namespace ServiceIEDUCA.Services
             if (user == null)
                 return null;
 
+            // Verificar se o email já está em uso por outro usuário
+            if (user.Email != userCreateDto.Email)
+            {
+                var emailEmUso = await _context.Users
+                    .AnyAsync(u => u.Id != id && u.Email.ToLower() == userCreateDto.Email.ToLower());
+
+                if (emailEmUso)
+                    throw new InvalidOperationException($"O e-mail '{userCreateDto.Email}' já está em uso por outro usuário.");
+            }
+
+            // Verificar se o telefone já está em uso por outro usuário
+            if (!string.IsNullOrWhiteSpace(userCreateDto.Telefone) && user.Telefone != userCreateDto.Telefone)
+            {
+                var telefoneExatoEmUso = await _context.Users
+                    .AnyAsync(u => u.Id != id && u.Telefone == userCreateDto.Telefone);
+
+                if (telefoneExatoEmUso)
+                    throw new InvalidOperationException($"O telefone '{userCreateDto.Telefone}' já está em uso por outro usuário.");
+
+                var novoTelefoneNormalized = new string(userCreateDto.Telefone.Where(char.IsDigit).ToArray());
+                if (!string.IsNullOrEmpty(novoTelefoneNormalized))
+                {
+                    var telefonesExistentes = await _context.Users
+                        .Where(u => u.Id != id && u.Telefone != null)
+                        .Select(u => u.Telefone)
+                        .ToListAsync();
+
+                    foreach (var t in telefonesExistentes)
+                    {
+                        var norm = new string(t.Where(char.IsDigit).ToArray());
+                        if (norm == novoTelefoneNormalized)
+                            throw new InvalidOperationException($"O telefone '{userCreateDto.Telefone}' já está em uso por outro usuário.");
+                    }
+                }
+            }
+
             user.Nome = userCreateDto.Nome;
-            user.Senha = HashPassword(userCreateDto.Senha);
+            user.Email = userCreateDto.Email;
+            user.Telefone = userCreateDto.Telefone;
+            
+            // Só atualiza a senha se foi fornecida
+            if (!string.IsNullOrWhiteSpace(userCreateDto.Senha))
+            {
+                user.Senha = HashPassword(userCreateDto.Senha);
+            }
 
             _context.Users.Update(user);
             await _context.SaveChangesAsync();
@@ -135,6 +211,72 @@ namespace ServiceIEDUCA.Services
             user.Senha = HashPassword(novaSenha);
             await _context.SaveChangesAsync();
             return true;
+        }
+
+        public async Task<UserDto?> UpdateSelfProfileAsync(int id, UserSelfUpdateDto dto)
+        {
+            var user = await _context.Users.FindAsync(id);
+            if (user == null)
+                return null;
+
+            // OBRIGATÓRIO: Verificar senha atual
+            var hashedSenhaAtual = HashPassword(dto.SenhaAtual);
+            if (user.Senha != hashedSenhaAtual)
+            {
+                throw new UnauthorizedAccessException("Senha atual incorreta");
+            }
+
+            // Verificar se o email já está em uso por outro usuário
+            if (user.Email != dto.Email)
+            {
+                var emailEmUso = await _context.Users
+                    .AnyAsync(u => u.Id != id && u.Email.ToLower() == dto.Email.ToLower());
+
+                if (emailEmUso)
+                    throw new InvalidOperationException($"O e-mail '{dto.Email}' já está em uso por outro usuário.");
+            }
+
+            // Verificar se o telefone já está em uso por outro usuário
+            if (!string.IsNullOrWhiteSpace(dto.Telefone) && user.Telefone != dto.Telefone)
+            {
+                var telefoneExatoEmUso = await _context.Users
+                    .AnyAsync(u => u.Id != id && u.Telefone == dto.Telefone);
+
+                if (telefoneExatoEmUso)
+                    throw new InvalidOperationException($"O telefone '{dto.Telefone}' já está em uso por outro usuário.");
+
+                var novoTelefoneNormalized = new string(dto.Telefone.Where(char.IsDigit).ToArray());
+                if (!string.IsNullOrEmpty(novoTelefoneNormalized))
+                {
+                    var telefonesExistentes = await _context.Users
+                        .Where(u => u.Id != id && u.Telefone != null)
+                        .Select(u => u.Telefone)
+                        .ToListAsync();
+
+                    foreach (var t in telefonesExistentes)
+                    {
+                        var norm = new string(t.Where(char.IsDigit).ToArray());
+                        if (norm == novoTelefoneNormalized)
+                            throw new InvalidOperationException($"O telefone '{dto.Telefone}' já está em uso por outro usuário.");
+                    }
+                }
+            }
+
+            // Atualizar dados básicos
+            user.Nome = dto.Nome;
+            user.Email = dto.Email;
+            user.Telefone = dto.Telefone;
+            
+            // Atualizar senha se fornecida
+            if (!string.IsNullOrWhiteSpace(dto.NovaSenha))
+            {
+                user.Senha = HashPassword(dto.NovaSenha);
+            }
+
+            _context.Users.Update(user);
+            await _context.SaveChangesAsync();
+
+            return MapToDto(user);
         }
 
         private string HashPassword(string password)

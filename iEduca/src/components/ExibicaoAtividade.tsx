@@ -71,14 +71,12 @@ export const ExibicaoAtividadeComponent: React.FC<ExibicaoAtividadeProps> = ({
         </div>
       </div>
 
-      {/* Questões */}
       <div className="space-y-6">
         {atividade.questoes.map((questao) => {
           const eMultiplaEscolha = isMultiplaEscolha(questao);
           
           return (
             <div key={questao.numero} className="p-5 border-2 border-gray-200 rounded-lg hover:border-blue-300 transition-all">
-              {/* Cabeçalho da questão com badge */}
               <div className="flex items-center justify-between mb-3">
                 <h3 className="font-semibold text-slate-900">
                   Questão {questao.numero}
@@ -97,7 +95,6 @@ export const ExibicaoAtividadeComponent: React.FC<ExibicaoAtividadeProps> = ({
               </p>
 
               {eMultiplaEscolha ? (
-                // Múltipla escolha
                 <div className="space-y-2">
                   {questao.alternativas.map((alt) => {
                     const alternativaId = alt.id || alt.letra;
@@ -127,7 +124,6 @@ export const ExibicaoAtividadeComponent: React.FC<ExibicaoAtividadeProps> = ({
                   })}
                 </div>
               ) : (
-                // Discursiva
                 <div className="space-y-2">
                   <label className="block text-sm font-semibold text-slate-700 mb-2">
                     Sua resposta:
@@ -149,7 +145,6 @@ export const ExibicaoAtividadeComponent: React.FC<ExibicaoAtividadeProps> = ({
         })}
       </div>
 
-      {/* Botão Enviar */}
       <div className="mt-8">
         <button
           onClick={handleSubmit}
@@ -164,7 +159,6 @@ export const ExibicaoAtividadeComponent: React.FC<ExibicaoAtividadeProps> = ({
         </button>
       </div>
 
-      {/* Contador de respostas */}
       <div className="mt-4 text-center text-sm text-gray-600">
         {Object.keys(respostas).length} de {atividade.questoes.length} questões respondidas
       </div>
@@ -198,7 +192,6 @@ export const ResultadoAtividadeComponent: React.FC<ResultadoAtividadeProps> = ({
 
   return (
     <div className="max-w-4xl mx-auto p-6 bg-white rounded-lg shadow-md">
-      {/* Cabeçalho com resultado geral */}
       <div className="text-center mb-8">
         <div className="text-6xl mb-4">
           {getStatusEmoji(resultado.nota)}
@@ -210,7 +203,6 @@ export const ResultadoAtividadeComponent: React.FC<ResultadoAtividadeProps> = ({
           {atividade.configuracao.materia} - {atividade.configuracao.conteudo}
         </p>
 
-        {/* Card de nota */}
         <div className="inline-block p-6 bg-gradient-to-br from-blue-50 to-purple-50 border-2 border-blue-200 rounded-lg">
           <div className="flex items-center justify-center gap-8">
             <div className="text-center">
@@ -237,7 +229,6 @@ export const ResultadoAtividadeComponent: React.FC<ResultadoAtividadeProps> = ({
         </div>
       </div>
 
-      {/* Correção questão por questão */}
       <div className="space-y-4">
         <h3 className="text-xl font-bold text-slate-900 mb-4">
           📝 Correção Detalhada
@@ -260,7 +251,6 @@ export const ResultadoAtividadeComponent: React.FC<ResultadoAtividadeProps> = ({
               </span>
             </div>
 
-            {/* Questão original */}
             <div className="mb-3">
               <p className="text-sm text-slate-700 mb-1">Enunciado:</p>
               <p className="text-slate-900">
@@ -285,7 +275,6 @@ export const ResultadoAtividadeComponent: React.FC<ResultadoAtividadeProps> = ({
               )}
             </div>
 
-            {/* Explicação - sempre visível quando existir */}
             {correcao.explicacao && (
               <div className="mt-4 p-4 bg-blue-50 border-l-4 border-blue-500 rounded-lg">
                 <p className="text-sm font-bold text-blue-900 mb-2 flex items-center gap-2">
@@ -299,7 +288,6 @@ export const ResultadoAtividadeComponent: React.FC<ResultadoAtividadeProps> = ({
         ))}
       </div>
 
-      {/* Mensagem motivacional */}
       <div className="mt-8 p-6 bg-gradient-to-r from-purple-50 to-blue-50 border-2 border-purple-200 rounded-lg">
         <h4 className="font-bold text-purple-900 mb-2">💪 Continue Praticando!</h4>
         <p className="text-slate-800 mb-4">

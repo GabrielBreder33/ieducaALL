@@ -1,4 +1,4 @@
-const API_URL = 'http://localhost:5000/api';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 export interface Escola {
   id: number;
@@ -46,8 +46,17 @@ class EscolaService {
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Erro ao cadastrar escola');
+      let errorMessage = 'Erro ao cadastrar escola';
+      try {
+        const error = await response.json();
+        errorMessage = error?.message || (typeof error === 'string' ? error : JSON.stringify(error));
+      } catch {
+        try {
+          const text = await response.text();
+          if (text) errorMessage = text;
+        } catch {}
+      }
+      throw new Error(errorMessage || 'Erro ao cadastrar escola');
     }
 
     return response.json();
@@ -63,8 +72,17 @@ class EscolaService {
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Erro ao atualizar escola');
+      let errorMessage = 'Erro ao atualizar escola';
+      try {
+        const error = await response.json();
+        errorMessage = error?.message || (typeof error === 'string' ? error : JSON.stringify(error));
+      } catch {
+        try {
+          const text = await response.text();
+          if (text) errorMessage = text;
+        } catch {}
+      }
+      throw new Error(errorMessage || 'Erro ao atualizar escola');
     }
   }
 
@@ -88,8 +106,21 @@ class EscolaService {
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Email ou senha incorretos');
+      if (response.status === 400 || response.status === 401) {
+        throw new Error('Email ou senha incorretos');
+      }
+
+      let errorMessage = 'Email ou senha incorretos';
+      try {
+        const error = await response.json();
+        errorMessage = error?.message || (typeof error === 'string' ? error : JSON.stringify(error));
+      } catch {
+        try {
+          const text = await response.text();
+          if (text) errorMessage = text;
+        } catch {}
+      }
+      throw new Error(errorMessage || 'Email ou senha incorretos');
     }
 
     const escola: Escola = await response.json();

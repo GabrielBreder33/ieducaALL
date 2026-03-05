@@ -15,7 +15,7 @@ namespace ServiceIEDUCA.Models
         [MaxLength(255)]
         public string Senha { get; set; } = string.Empty;
 
-        public DateTime DataCriacao { get; set; } = DateTime.Now;
+        public DateTime DataCriacao { get; set; } = DateTime.UtcNow;
 
         [Required]
         [MaxLength(255)]

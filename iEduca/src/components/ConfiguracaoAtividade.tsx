@@ -6,8 +6,7 @@ import {
   AnoEscolar, 
   NivelDificuldade, 
   TipoQuestao,
-  getAnosPorSegmento,
-  sugestoesConteudo
+  getAnosPorSegmento
 } from '../types/atividade';
 
 interface ConfiguracaoAtividadeProps {
@@ -19,42 +18,34 @@ export const ConfiguracaoAtividadeComponent: React.FC<ConfiguracaoAtividadeProps
   onGerarAtividade, 
   carregando = false 
 }) => {
-  // Estado do formulário
   const [materia, setMateria] = useState<Materia>('Matemática');
   const [segmento, setSegmento] = useState<Segmento>('Fundamental II');
   const [ano, setAno] = useState<AnoEscolar>('6º ano');
+  const [concurso, setConcurso] = useState('');
   const [conteudo, setConteudo] = useState('');
   const [nivel, setNivel] = useState<NivelDificuldade>('Médio');
   const [quantidade, setQuantidade] = useState<5 | 10 | 15>(10);
   const [explicacao, setExplicacao] = useState(true);
-  const tipo: TipoQuestao = 'MultiplaEscolha'; // FIXO: Apenas múltipla escolha
+  const tipo: TipoQuestao = 'MultiplaEscolha'; 
 
-  // Controle de autocomplete
-  const [mostrarSugestoes, setMostrarSugestoes] = useState(false);
-  const [sugestoesFiltradas, setSugestoesFiltradas] = useState<string[]>([]);
-
-  // Atualiza anos disponíveis quando segmento muda
   useEffect(() => {
     const anosDisponiveis = getAnosPorSegmento(segmento);
     if (anosDisponiveis.length > 0) {
       setAno(anosDisponiveis[0]);
     }
-  }, [segmento]);
 
-  // Filtra sugestões de conteúdo
-  useEffect(() => {
-    if (conteudo.length > 0) {
-      const filtradas = sugestoesConteudo[materia].filter(s => 
-        s.toLowerCase().includes(conteudo.toLowerCase())
-      );
-      setSugestoesFiltradas(filtradas);
-    } else {
-      setSugestoesFiltradas(sugestoesConteudo[materia].slice(0, 5));
+    if (segmento !== 'Concurso') {
+      setConcurso('');
     }
-  }, [conteudo, materia]);
+  }, [segmento]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (segmento === 'Concurso' && !concurso.trim()) {
+      alert('Por favor, informe para qual concurso você está estudando');
+      return;
+    }
     
     if (!conteudo.trim()) {
       alert('Por favor, informe o conteúdo da atividade');
@@ -65,10 +56,11 @@ export const ConfiguracaoAtividadeComponent: React.FC<ConfiguracaoAtividadeProps
       materia,
       segmento,
       ano,
+      concurso: segmento === 'Concurso' ? concurso.trim() : undefined,
       conteudo: conteudo.trim(),
       nivel,
       quantidade,
-      tipo: 'MultiplaEscolha', // SEMPRE múltipla escolha
+      tipo,
       explicacao
     };
 
@@ -82,7 +74,6 @@ export const ConfiguracaoAtividadeComponent: React.FC<ConfiguracaoAtividadeProps
       </h2>
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Passo 1: Matéria */}
         <div>
           <label className="block text-sm font-semibold text-slate-800 mb-2">
             🔹 Passo 1: Selecione a Matéria
@@ -105,13 +96,12 @@ export const ConfiguracaoAtividadeComponent: React.FC<ConfiguracaoAtividadeProps
           </div>
         </div>
 
-        {/* Passo 2: Segmento */}
         <div>
           <label className="block text-sm font-semibold text-slate-800 mb-2">
             🔹 Passo 2: Selecione o Segmento
           </label>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {(['Fundamental I', 'Fundamental II', 'Ensino Médio', 'ENEM'] as Segmento[]).map(s => (
+            {(['Fundamental I', 'Fundamental II', 'Ensino Médio', 'ENEM', 'Concurso'] as Segmento[]).map(s => (
               <button
                 key={s}
                 type="button"
@@ -128,65 +118,65 @@ export const ConfiguracaoAtividadeComponent: React.FC<ConfiguracaoAtividadeProps
           </div>
         </div>
 
-        {/* Passo 3: Ano */}
+        {segmento === 'Concurso' && (
+          <div>
+            <label className="block text-sm font-semibold text-slate-800 mb-2">
+              🔹 Concurso alvo
+            </label>
+            <input
+              type="text"
+              value={concurso}
+              onChange={(e) => setConcurso(e.target.value)}
+              placeholder="Ex: Polícia Federal, Banco do Brasil, TRT, INSS..."
+              className="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-purple-500 focus:outline-none text-slate-900 bg-white"
+              required={segmento === 'Concurso'}
+            />
+          </div>
+        )}
+
         <div>
           <label className="block text-sm font-semibold text-slate-800 mb-2">
             🔹 Passo 3: Selecione o Ano/Série
           </label>
-          <select
-            value={ano}
-            onChange={(e) => setAno(e.target.value as AnoEscolar)}
-            className="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-purple-500 focus:outline-none text-slate-900 bg-white"
-          >
-            {getAnosPorSegmento(segmento).map(a => (
-              <option key={a} value={a}>{a}</option>
-            ))}
-          </select>
-        </div>
-
-        {/* Passo 4: Conteúdo */}
-        <div className="relative">
-          <label className="block text-sm font-semibold text-slate-800 mb-2">
-            🔹 Passo 4: Informe o Conteúdo
-          </label>
-          <input
-            type="text"
-            value={conteudo}
-            onChange={(e) => setConteudo(e.target.value)}
-            onFocus={() => setMostrarSugestoes(true)}
-            onBlur={() => setTimeout(() => setMostrarSugestoes(false), 200)}
-            placeholder="Ex: Função do 2º grau, Interpretação de texto, Cadeia alimentar..."
-            className="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-orange-500 focus:outline-none text-slate-900 bg-white"
-            required
-          />
-          
-          {/* Autocomplete */}
-          {mostrarSugestoes && sugestoesFiltradas.length > 0 && (
-            <div className="absolute z-10 w-full mt-1 bg-white border-2 border-gray-300 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-              {sugestoesFiltradas.map((sugestao, index) => (
-                <button
-                  key={index}
-                  type="button"
-                  onClick={() => {
-                    setConteudo(sugestao);
-                    setMostrarSugestoes(false);
-                  }}
-                  className="w-full text-left p-3 hover:bg-orange-50 border-b border-gray-100 last:border-b-0 text-slate-900"
-                >
-                  {sugestao}
-                </button>
+          {segmento === 'Concurso' ? (
+            <input
+              type="text"
+              value={ano}
+              readOnly
+              className="w-full p-3 border-2 border-gray-300 rounded-lg text-slate-900 bg-slate-100"
+            />
+          ) : (
+            <select
+              value={ano}
+              onChange={(e) => setAno(e.target.value as AnoEscolar)}
+              className="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-purple-500 focus:outline-none text-slate-900 bg-white"
+            >
+              {getAnosPorSegmento(segmento).map(a => (
+                <option key={a} value={a}>{a}</option>
               ))}
-            </div>
+            </select>
           )}
         </div>
 
-        {/* Passo 5: Configurações */}
+        <div>
+          <label className="block text-sm font-semibold text-slate-800 mb-2">
+            🔹 Passo 4: Informe o Conteúdo
+          </label>
+          <textarea
+            value={conteudo}
+            onChange={(e) => setConteudo(e.target.value)}
+            rows={4}
+            placeholder="Descreva os tópicos, assuntos e habilidades que você quer praticar. Ex: Função do 2º grau com foco em interpretação de gráficos e problemas contextualizados."
+            className="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-orange-500 focus:outline-none text-slate-900 bg-white"
+            required
+          />
+        </div>
+
         <div className="border-2 border-gray-200 rounded-lg p-4 bg-slate-50">
           <h3 className="text-sm font-semibold text-slate-800 mb-4">
             🔹 Passo 5: Configurações da Atividade
           </h3>
 
-          {/* Quantidade de questões */}
           <div className="mb-4">
             <label className="block text-sm font-medium text-slate-800 mb-2">
               Quantidade de questões
@@ -209,7 +199,6 @@ export const ConfiguracaoAtividadeComponent: React.FC<ConfiguracaoAtividadeProps
             </div>
           </div>
 
-          {/* Nível */}
           <div className="mb-4">
             <label className="block text-sm font-medium text-slate-800 mb-2">
               Nível de dificuldade
@@ -236,7 +225,6 @@ export const ConfiguracaoAtividadeComponent: React.FC<ConfiguracaoAtividadeProps
             </div>
           </div>
 
-          {/* Mostrar explicação */}
           <div>
             <label className="flex items-center gap-2 cursor-pointer">
               <input
@@ -252,7 +240,6 @@ export const ConfiguracaoAtividadeComponent: React.FC<ConfiguracaoAtividadeProps
           </div>
         </div>
 
-        {/* Botão Gerar */}
         <button
           type="submit"
           disabled={carregando}
@@ -266,12 +253,12 @@ export const ConfiguracaoAtividadeComponent: React.FC<ConfiguracaoAtividadeProps
         </button>
       </form>
 
-      {/* Preview da configuração */}
       <div className="mt-6 p-4 bg-blue-50 border-2 border-blue-200 rounded-lg">
         <h4 className="font-semibold text-blue-800 mb-2">📋 Resumo da Configuração:</h4>
         <div className="text-sm text-blue-700 space-y-1">
           <p><strong>Matéria:</strong> {materia}</p>
           <p><strong>Segmento:</strong> {segmento}</p>
+          {segmento === 'Concurso' && <p><strong>Concurso:</strong> {concurso || '(não informado)'}</p>}
           <p><strong>Ano:</strong> {ano}</p>
           <p><strong>Conteúdo:</strong> {conteudo || '(não informado)'}</p>
           <p><strong>Dificuldade:</strong> {nivel} | <strong>Questões:</strong> {quantidade} | <strong>Tipo:</strong> Múltipla Escolha</p>

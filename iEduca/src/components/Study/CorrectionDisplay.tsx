@@ -152,7 +152,6 @@ export default function CorrectionDisplay({
 
         {activeTab === 'analysis' && (
           <div className="space-y-6">
-            {/* Resumo Final */}
             <div className="bg-slate-800 rounded-lg p-6">
               <h3 className="font-bold text-blue-400 mb-3 flex items-center gap-2">
                 <span className="text-xl">📋</span>
@@ -161,7 +160,6 @@ export default function CorrectionDisplay({
               <p className="text-slate-200">{correction.resumoFinal}</p>
             </div>
 
-            {/* Pontos Positivos */}
             <div className="bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border border-emerald-500/30 rounded-lg p-6">
               <h3 className="font-bold text-emerald-400 mb-3 flex items-center gap-2">
                 <span className="text-xl">✅</span>
@@ -177,7 +175,6 @@ export default function CorrectionDisplay({
               </ul>
             </div>
 
-            {/* Pontos a Melhorar */}
             <div className="bg-gradient-to-r from-orange-500/10 to-amber-500/10 border border-orange-500/30 rounded-lg p-6">
               <h3 className="font-bold text-orange-400 mb-3 flex items-center gap-2">
                 <span className="text-xl">⚠️</span>
@@ -193,7 +190,6 @@ export default function CorrectionDisplay({
               </ul>
             </div>
 
-            {/* Recomendações */}
             <div className="bg-slate-800 rounded-lg p-6">
               <h3 className="font-bold text-blue-400 mb-3 flex items-center gap-2">
                 <span className="text-xl">💡</span>
@@ -208,45 +204,6 @@ export default function CorrectionDisplay({
                 ))}
               </ul>
             </div>
-
-            {/* Proposta de Intervenção */}
-            {/* {correction.propostaIntervencao && (
-              <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-6">
-                <h3 className="font-bold text-purple-400 mb-3 flex items-center gap-2">
-                  <span className="text-xl">🎯</span>
-                  Proposta de Intervenção
-                </h3>
-                <p className="text-slate-200 mb-4">{correction.propostaIntervencao.avaliacao}</p>
-                
-                {correction.propostaIntervencao.sugestoesConcretas.length > 0 && (
-                  <div className="space-y-3">
-                    <p className="text-sm text-purple-300 font-semibold">Sugestões de Melhoria:</p>
-                    {correction.propostaIntervencao.sugestoesConcretas.map((sug, idx) => (
-                      <div key={idx} className="bg-slate-800/50 rounded-lg p-4">
-                        <div className="grid grid-cols-2 gap-3 text-sm">
-                          <div>
-                            <span className="text-slate-400">Agente:</span>
-                            <p className="text-slate-200">{sug.agente}</p>
-                          </div>
-                          <div>
-                            <span className="text-slate-400">Prazo:</span>
-                            <p className="text-slate-200">{sug.prazo}</p>
-                          </div>
-                          <div className="col-span-2">
-                            <span className="text-slate-400">Ação:</span>
-                            <p className="text-slate-200">{sug.acao}</p>
-                          </div>
-                          <div className="col-span-2">
-                            <span className="text-slate-400">Indicador:</span>
-                            <p className="text-slate-200">{sug.indicador}</p>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )} */}
           </div>
         )}
 
@@ -283,7 +240,6 @@ export default function CorrectionDisplay({
                 
                 <p className="text-sm text-slate-300 mb-3">{comp.comentario}</p>
                 
-                {/* Evidências */}
                 {comp.evidencias.length > 0 && (
                   <div className="mb-3">
                     <p className="text-xs text-emerald-400 font-semibold mb-1">Evidências:</p>
@@ -298,7 +254,6 @@ export default function CorrectionDisplay({
                   </div>
                 )}
                 
-                {/* Melhorias */}
                 {comp.melhorias.length > 0 && (
                   <div>
                     <p className="text-xs text-orange-400 font-semibold mb-1">Como Melhorar:</p>

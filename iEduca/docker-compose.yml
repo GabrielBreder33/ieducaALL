@@ -1,0 +1,28 @@
+version: "3.9"
+
+services:
+  ieduca-frontend:
+    image: ieduca-frontend:latest
+    networks:
+      - ieduca
+      - nginx_public
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+      update_config:
+        parallelism: 1
+        delay: 10s
+        order: start-first
+      rollback_config:
+        parallelism: 1
+        delay: 5s
+        order: stop-first
+
+networks:
+  ieduca:
+    external: true
+  nginx_public:
+    external: true

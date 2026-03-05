@@ -176,7 +176,7 @@ namespace ServiceIEDUCA.Controllers
                     NivelDificuldade = dto.NivelDificuldade,
                     TotalQuestoes = dto.TotalQuestoes,
                     Ativo = true,
-                    CriadoEm = DateTime.Now
+                    CriadoEm = DateTime.UtcNow
                 };
 
                 _context.Atividades.Add(atividade);
@@ -237,7 +237,7 @@ namespace ServiceIEDUCA.Controllers
                 if (dto.Ativo.HasValue)
                     atividade.Ativo = dto.Ativo.Value;
 
-                atividade.AtualizadoEm = DateTime.Now;
+                atividade.AtualizadoEm = DateTime.UtcNow;
 
                 await _context.SaveChangesAsync();
 
@@ -262,7 +262,7 @@ namespace ServiceIEDUCA.Controllers
 
                 // Soft delete
                 atividade.Ativo = false;
-                atividade.AtualizadoEm = DateTime.Now;
+                atividade.AtualizadoEm = DateTime.UtcNow;
 
                 await _context.SaveChangesAsync();
 

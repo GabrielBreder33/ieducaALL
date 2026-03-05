@@ -1,24 +1,45 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { authService } from '../../../services/authService';
 import { aiService } from '../../../services/aiService';
 import type { User } from '../../../types';
 import { NotificationDropdown, ProfileMenu } from '../../../components/Dashboard';
+import { AlunoSidebar } from '../../../components/AlunoSidebar';
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+// Limites por redação
+const MIN_CHARS = 4000;
+const MAX_CHARS = 6800;
+
+const countWords = (text: string) => {
+  const trimmed = text.trim();
+  return trimmed ? trimmed.split(/\s+/).length : 0;
+};
 
 export default function Redacao() {
   const [user, setUser] = useState<User | null>(null);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const rascunhoIdParam = searchParams.get('rascunhoId');
+  const rascunhoId = rascunhoIdParam ? parseInt(rascunhoIdParam) : null;
   const [darkMode, setDarkMode] = useState<boolean>(false);
   const [isEditingTheme, setIsEditingTheme] = useState<boolean>(true);
+  const [rascunhoAtualId, setRascunhoAtualId] = useState<number | null>(null);
+  const [enviandoCorrecao, setEnviandoCorrecao] = useState(false);
+  const [validationPopup, setValidationPopup] = useState({ visible: false, title: '', message: '' });
   
   const [essayData, setEssayData] = useState({
     theme: '',
     type: 'ENEM' as const,
-    minLines: 20,
     content: '',
     wordCount: 0,
-    lineCount: 0
+    charCount: 0,
+    
   });
+  
+  const showValidation = (title: string, message: string) => {
+    setValidationPopup({ visible: true, title, message });
+  };
 
   useEffect(() => {
     const currentUser = authService.getCurrentUser();
@@ -26,62 +47,162 @@ export default function Redacao() {
       navigate('/login');
       return;
     }
+
     setUser(currentUser);
-  }, [navigate]);
+
+    const loadRascunho = async () => {
+      if (!rascunhoId) {
+        setRascunhoAtualId(null);
+        setIsEditingTheme(true);
+        return;
+      }
+
+      try {
+        const response = await fetch(`${API_URL}/RedacaoCorrecao/${rascunhoId}`);
+        if (!response.ok) {
+          throw new Error('Erro ao carregar rascunho');
+        }
+
+        const data = await response.json();
+        const content = data?.textoRedacao || '';
+
+        setEssayData({
+          theme: data?.tema || 'Rascunho sem tema',
+          type: 'ENEM',
+          content,
+          wordCount: countWords(content),
+          charCount: content.length,
+        });
+        setRascunhoAtualId(rascunhoId);
+        setIsEditingTheme(!(data?.tema && data.tema.trim().length > 0));
+      } catch (error) {
+        console.error('Erro ao carregar rascunho:', error);
+        setValidationPopup({
+          visible: true,
+          title: 'Erro ao carregar rascunho',
+          message: 'Não foi possível carregar este rascunho. Tente novamente pelo histórico.'
+        });
+      }
+    };
+
+    loadRascunho();
+  }, [navigate, rascunhoId]);
 
   const handleEssayChange = (content: string) => {
-    const lines = content.split('\n');
-    const words = content.trim().split(/\s+/).filter(word => word.length > 0);
-
-    let totalLines = 0;
-    lines.forEach(line => {
-      if (line.trim().length > 0) {
-        totalLines += Math.max(1, Math.ceil(line.length / 90));
-      }
-    });
-
-    setEssayData({
-      ...essayData,
+    setEssayData((prev) => ({
+      ...prev,
       content,
-      lineCount: totalLines,
-      wordCount: words.length
-    });
+      wordCount: countWords(content),
+      charCount: content.length,
+    }));
+
+    if (content.length > MAX_CHARS) {
+      showValidation(
+        'Limite de caracteres excedido',
+        `Sua redação excede o máximo de ${MAX_CHARS.toLocaleString('pt-BR')} caracteres. Remova caracteres para prosseguir.`
+      );
+    }
   };
 
   const handleSubmitEssay = async () => {
-    if (essayData.lineCount < essayData.minLines) {
-      alert(`Sua redação precisa ter no mínimo ${essayData.minLines} linhas. Atualmente: ${essayData.lineCount} linhas.`);
+    if (!user || !user.id) {
+      alert('Erro: Usuário não autenticado');
+      navigate('/login');
       return;
     }
 
-    if (essayData.wordCount < 50) {
-      alert('Sua redação precisa ter mais conteúdo.');
+    if (!essayData.theme.trim()) {
+      showValidation('Informe o tema', 'Defina um tema para conseguirmos enviar sua redação.');
+      setIsEditingTheme(true);
       return;
     }
 
+    if (!essayData.content.trim()) {
+      showValidation('Texto obrigatório', 'Escreva a redação antes de enviar para correção.');
+      return;
+    }
+
+    if (essayData.charCount < MIN_CHARS) {
+      showValidation(
+        'Redação muito curta',
+        `Escreva pelo menos ${MIN_CHARS.toLocaleString('pt-BR')} caracteres antes de enviar para correção.`
+      );
+      return;
+    }
+
+    if (essayData.charCount > MAX_CHARS) {
+      showValidation(
+        'Limite de caracteres excedido',
+        `Sua redação excede o máximo de ${MAX_CHARS.toLocaleString('pt-BR')} caracteres. Remova caracteres para prosseguir.`
+      );
+      return;
+    }
+
+    try {
+      setEnviandoCorrecao(true);
+
+      await aiService.correctEssay(
+        user.id,
+        null,
+        essayData.theme.trim(),
+        essayData.content,
+        essayData.type
+      );
+
+      navigate('/aluno/redacao/historico');
+    } catch (error) {
+      console.error('Erro ao corrigir redação:', error);
+      alert('Erro ao processar a correção. Tente novamente.');
+    } finally {
+      setEnviandoCorrecao(false);
+    }
+  };
+
+  const handleSalvarRascunho = async () => {
     if (!user || !user.id) {
       alert('Erro: Usuário não autenticado');
       return;
     }
 
+    if (!essayData.theme.trim() && !essayData.content.trim()) {
+      alert('Preencha ao menos o tema ou conteúdo para salvar o rascunho.');
+      return;
+    }
+
     try {
-      // Para redações avulsas (não vinculadas a uma atividade específica), usar null
-      const execucaoId = null;
+      if (rascunhoAtualId) {
+        const response = await fetch(`${API_URL}/RedacaoCorrecao/${rascunhoAtualId}/rascunho`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            tema: essayData.theme.trim() || 'Rascunho sem tema',
+            textoRedacao: essayData.content
+          })
+        });
 
-      // Enviar redação para correção
-      const response = await aiService.correctEssay(
-        user.id,
-        execucaoId,
-        essayData.theme,
-        essayData.content,
-        essayData.type
-      );
+        if (!response.ok) {
+          throw new Error('Erro ao atualizar rascunho');
+        }
+      } else {
+        const resultado = await aiService.correctEssay(
+          user.id,
+          null,
+          essayData.theme.trim() || 'Rascunho sem tema',
+          essayData.content,
+          'rascunho'
+        );
 
-      // Redirecionar para o histórico de redações
+        if (resultado?.id) {
+          setRascunhoAtualId(resultado.id);
+        }
+      }
+
       navigate('/aluno/redacao/historico');
     } catch (error) {
-      console.error('Erro ao corrigir redação:', error);
-      alert('Erro ao processar a correção. Tente novamente.');
+      console.error('Erro ao salvar rascunho:', error);
+      alert('Erro ao salvar rascunho. Tente novamente.');
     }
   };
 
@@ -101,75 +222,57 @@ export default function Redacao() {
   }
 
   return (
+    <>
     <div className={`min-h-screen transition-colors duration-300 ${darkMode
         ? 'bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900'
         : 'bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200'
       }`}>
-      {/* Sidebar */}
-      <div className={`fixed left-0 top-0 h-screen w-52 border-r transition-colors duration-300 flex flex-col ${darkMode
-          ? 'bg-slate-900/50 border-slate-700/50'
-          : 'bg-white border-slate-200'
-        }`}>
-        <div className="p-6 flex-shrink-0">
-          <div className="flex items-center gap-2 mb-8">
-            <h1 className="text-xl font-bold text-blue-600">IEDUCA</h1>
-          </div>
+      <AlunoSidebar darkMode={darkMode} onToggleTheme={() => setDarkMode(!darkMode)} />
 
-          <nav className="space-y-2">
-            <button 
-              onClick={() => navigate('/aluno/estudos')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors ${darkMode
-                  ? 'text-slate-400 hover:bg-slate-800 hover:text-white'
-                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-                }`}>
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-              </svg>
-              Dashboard
-            </button>
+                    {/* Validation Popup */}
+                    {validationPopup.visible && (
+                      <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+                        <div className="absolute inset-0 bg-black/50" onClick={() => setValidationPopup({ ...validationPopup, visible: false })}></div>
+                        <div className={`relative w-full max-w-md mx-auto rounded-2xl overflow-hidden shadow-2xl ${darkMode ? 'bg-slate-800 text-white border border-slate-700' : 'bg-white text-slate-900'}`}>
+                          <div className="p-6">
+                            <div className="flex items-start gap-4">
+                              <div className={`flex-shrink-0 rounded-full p-2 ${darkMode ? 'bg-slate-700' : 'bg-blue-50'}`}>
+                                <svg className={`w-6 h-6 ${darkMode ? 'text-red-400' : 'text-blue-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M12 6v.01" />
+                                </svg>
+                              </div>
+                              <div className="flex-1">
+                                <h3 style={{ color: darkMode ? undefined : '#000' }} className="text-lg font-bold">{validationPopup.title}</h3>
+                                <p style={{ color: darkMode ? undefined : '#000' }} className="text-base mt-2 font-bold opacity-100 dark:text-slate-200">{validationPopup.message}</p>
+                              </div>
+                              <button onClick={() => setValidationPopup({ ...validationPopup, visible: false })} className={`ml-4 p-1 rounded-md ${darkMode ? 'text-slate-300 hover:bg-slate-700' : 'text-slate-500 hover:bg-slate-100'}`}>
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                              </button>
+                            </div>
 
-            <button className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-blue-600 text-white font-medium transition-colors">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-              </svg>
-              Redações
-            </button>
-
-            <button className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors ${darkMode
-                ? 'text-slate-400 hover:bg-slate-800 hover:text-white'
-                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-              }`}>
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-              </svg>
-              Atividades
-            </button>
-
-            <button className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors ${darkMode
-                ? 'text-slate-400 hover:bg-slate-800 hover:text-white'
-                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-              }`}>
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-              </svg>
-              Desempenho
-            </button>
-          </nav>
-        </div>
-
-        <div className="mt-auto p-6 flex-shrink-0">
-          <button
-            onClick={() => setDarkMode(!darkMode)}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors border-2 ${darkMode
-                ? 'text-slate-400 hover:bg-slate-800 hover:text-white border-slate-700'
-                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 border-slate-300'
-              }`}
-          >
-            <span className="text-xl">{darkMode ? '🌙' : '☀️'}</span>
-            Alternar Tema
-          </button>
-        </div>
-      </div>
+                            <div className="mt-6 flex justify-end gap-3">
+                              <button
+                                onClick={() => setValidationPopup({ ...validationPopup, visible: false })}
+                                className={`px-4 py-2 rounded-lg border ${darkMode ? 'border-slate-600 text-slate-200' : 'border-slate-200 text-slate-700'}`}
+                              >
+                                Continuar escrevendo
+                              </button>
+                              <button
+                                onClick={async () => {
+                                  setValidationPopup({ ...validationPopup, visible: false });
+                                  await handleSalvarRascunho();
+                                }}
+                                className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700"
+                              >
+                                Salvar Rascunho
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
 
       <div className="ml-52 min-h-screen flex flex-col">
         {/* Header */}
@@ -255,6 +358,7 @@ export default function Redacao() {
                           value={essayData.content}
                           onChange={(e) => handleEssayChange(e.target.value)}
                           placeholder="Comece a escrever sua redação aqui... Lembre-se de estruturar seu texto com uma introdução, parágrafos de desenvolvimento e uma conclusão."
+                          maxLength={MAX_CHARS}
                           className={`w-full h-96 resize-none focus:outline-none font-serif text-base leading-relaxed ${darkMode ? 'bg-slate-800 text-white placeholder-slate-500' : 'bg-white text-slate-900 placeholder-slate-400'}`}
                         />
                       </div>
@@ -272,15 +376,22 @@ export default function Redacao() {
                           </div>
                           <div>
                             <div className={`text-xs font-bold ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                              Linhas
+                              Caracteres
                             </div>
                             <div className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
-                              {essayData.lineCount}
+                              {essayData.charCount}
                             </div>
                             <div className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                              Min: {essayData.minLines} / Max 30
+                              Min: {MIN_CHARS.toLocaleString('pt-BR')} / Max {MAX_CHARS.toLocaleString('pt-BR')}
                             </div>
                           </div>
+                        </div>
+                        <div className={essayData.charCount < MIN_CHARS ? 'text-sm font-bold text-red-600 dark:text-red-400' : 'text-sm text-slate-500'}>
+                          {essayData.charCount >= MAX_CHARS
+                            ? 'Limite atingido'
+                            : (essayData.charCount < MIN_CHARS
+                                ? `${(MIN_CHARS - essayData.charCount).toLocaleString('pt-BR')} caracteres para o mínimo`
+                                : null)}
                         </div>
                       </div>
                     </div>
@@ -394,20 +505,32 @@ export default function Redacao() {
                   </div>
                 </div>
 
-                {/* Botão Enviar */}
-                <button
-                  onClick={handleSubmitEssay}
-                  className="w-full mt-6 bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-colors"
-                >
-                  Enviar para Correção
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                  </svg>
-                </button>
+                {/* Ações */}
+                <div className="w-full mt-6 grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <button
+                    onClick={handleSalvarRascunho}
+                    disabled={enviandoCorrecao}
+                    className="w-full bg-slate-600 hover:bg-slate-700 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-colors"
+                  >
+                    Salvar Rascunho
+                  </button>
+                  <button
+                    onClick={handleSubmitEssay}
+                    disabled={enviandoCorrecao}
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    Enviar para Correção
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                    </svg>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
         </div>
       </div>
+
+    </>
   );
 }
