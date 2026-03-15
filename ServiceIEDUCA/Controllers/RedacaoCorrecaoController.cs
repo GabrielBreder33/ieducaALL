@@ -390,7 +390,16 @@ namespace ServiceIEDUCA.Controllers
                                 : "processando",
                         progresso = r.Progresso,
                         notaTotal = r.NotaTotal,
-                        tipoAvaliacao = r.TipoAvaliacao
+                        tipoAvaliacao = r.TipoAvaliacao,
+                        revisadaPorProfessor = _context.ProfessorRedacaoRevisoes.Any(pr => pr.RedacaoCorrecaoId == r.Id),
+                        notaProfessor = _context.ProfessorRedacaoRevisoes
+                            .Where(pr => pr.RedacaoCorrecaoId == r.Id)
+                            .Select(pr => (decimal?)pr.NotaTotalProfessor)
+                            .FirstOrDefault(),
+                        professorNome = _context.ProfessorRedacaoRevisoes
+                            .Where(pr => pr.RedacaoCorrecaoId == r.Id)
+                            .Select(pr => pr.Professor!.Nome)
+                            .FirstOrDefault()
                     })
                     .ToListAsync();
 
@@ -456,6 +465,12 @@ namespace ServiceIEDUCA.Controllers
                     return NotFound(new { message = "Redação não encontrada" });
                 }
 
+                // Buscar revisão do professor (se existir)
+                var revisaoProfessor = await _context.ProfessorRedacaoRevisoes
+                    .Include(r => r.CompetenciaRevisoes)
+                    .Include(r => r.Professor)
+                    .FirstOrDefaultAsync(r => r.RedacaoCorrecaoId == id);
+
                 var feedbacksAgrupados = new
                 {
                     pontosPositivos = (correcaoDb.Feedbacks ?? new List<RedacaoFeedbacks>())
@@ -511,7 +526,24 @@ namespace ServiceIEDUCA.Controllers
                     versaoReescrita = correcaoDb.VersaoReescrita,
                     confiancaAvaliacao = correcaoDb.ConfiancaAvaliacao,
                     status = correcaoDb.Status,
-                    progresso = correcaoDb.Progresso
+                    progresso = correcaoDb.Progresso,
+                    revisaoProfessor = revisaoProfessor == null ? null : new
+                    {
+                        id = revisaoProfessor.Id,
+                        professorNome = revisaoProfessor.Professor?.Nome ?? "Professor",
+                        notaTotalProfessor = revisaoProfessor.NotaTotalProfessor,
+                        comentarioGeral = revisaoProfessor.ComentarioGeral,
+                        criadoEm = revisaoProfessor.CriadoEm,
+                        atualizadoEm = revisaoProfessor.AtualizadoEm,
+                        competencias = (revisaoProfessor.CompetenciaRevisoes ?? new List<ProfessorCompetenciaRevisao>())
+                            .OrderBy(c => c.NumeroCompetencia)
+                            .Select(c => new
+                            {
+                                numeroCompetencia = c.NumeroCompetencia,
+                                notaProfessor = c.NotaProfessor,
+                                comentarioProfessor = c.ComentarioProfessor
+                            }).ToArray()
+                    }
                 };
 
                 return Ok(correcao);

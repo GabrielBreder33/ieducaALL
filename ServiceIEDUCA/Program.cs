@@ -34,6 +34,8 @@ builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IConhecimentoService, ConhecimentoService>();
 builder.Services.AddScoped<IRankingService, RankingService>();
 
+builder.Services.AddScoped<IProfessorService, ProfessorService>();
+
 builder.Services.AddHttpClient<IRedacaoCorrecaoService, RedacaoCorrecaoService>();
 builder.Services.AddHttpClient<IDeepSeekService, DeepSeekService>(client =>
 {

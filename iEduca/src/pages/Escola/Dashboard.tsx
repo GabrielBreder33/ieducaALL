@@ -431,22 +431,22 @@ export default function EscolaDashboard() {
   if (!escola) return null;
 
   return (
-    <div className={`min-h-screen transition-colors ${
+    <div className={`min-h-screen overflow-x-hidden w-full max-w-full transition-colors ${
       darkMode ? 'bg-slate-900' : 'bg-slate-50'
     }`}>
       {/* Header */}
-      <div className={`sticky top-0 z-40 flex justify-between items-center px-6 py-4 backdrop-blur-lg border-b transition-colors ${
+      <div className={`sticky top-0 z-40 flex justify-between items-center px-3 sm:px-6 py-3 sm:py-4 backdrop-blur-lg border-b transition-colors ${
         darkMode 
           ? 'bg-slate-800/80 border-slate-700 shadow-lg'
           : 'bg-white/90 border-slate-300 shadow-sm'
       }`}>
         <div className="flex items-center">
-          <h1 className={`text-2xl font-bold tracking-wide transition-colors ${
+          <h1 className={`text-xl sm:text-2xl font-bold tracking-wide transition-colors ${
             darkMode ? 'text-white' : 'text-slate-900'
           }`}>IEDUCA</h1>
         </div>
 
-        <div className={`flex items-center gap-3 rounded-full p-1.5 transition-colors ${
+        <div className={`hidden sm:flex items-center gap-3 rounded-full p-1.5 transition-colors ${
           darkMode ? 'bg-slate-700/50' : 'bg-slate-200'
         }`}>
           <button 
@@ -480,23 +480,23 @@ export default function EscolaDashboard() {
           </button>
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 sm:gap-4">
           <NotificationDropdown darkMode={darkMode} />
           <button
             onClick={handleLogout}
-            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl font-medium transition-all"
+            className="px-3 sm:px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm sm:text-base font-medium transition-all"
           >
             Sair
           </button>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto p-5">
+      <div className="max-w-7xl mx-auto p-3 sm:p-5 w-full">
         {/* Info da Escola */}
-        <div className={`rounded-3xl p-6 mb-6 shadow-2xl transition-colors ${
+        <div className={`rounded-2xl sm:rounded-3xl p-4 sm:p-6 mb-4 sm:mb-6 shadow-2xl transition-colors ${
           darkMode ? 'bg-slate-800' : 'bg-white'
         }`}>
-          <h2 className={`text-3xl font-bold mb-2 transition-colors ${
+          <h2 className={`text-2xl sm:text-3xl font-bold mb-2 transition-colors ${
             darkMode ? 'text-white' : 'text-slate-900'
           }`}>{escola.nome}</h2>
           <p className={`transition-colors ${
@@ -517,13 +517,13 @@ export default function EscolaDashboard() {
         )}
 
         {/* Tabs */}
-        <div className={`rounded-2xl p-1 mb-6 shadow-xl transition-colors ${
+        <div className={`rounded-2xl p-1 mb-4 sm:mb-6 shadow-xl transition-colors overflow-x-auto scrollbar-hide ${
           darkMode ? 'bg-slate-800' : 'bg-white'
         }`}>
-          <div className="flex gap-2">
+          <div className="flex gap-2 min-w-max sm:min-w-0">
             <button
               onClick={() => setActiveTab('usuarios')}
-              className={`flex-1 py-3 px-4 rounded-xl font-semibold transition-all ${
+              className={`flex-1 py-2 sm:py-3 px-3 sm:px-4 rounded-xl text-sm sm:text-base font-semibold transition-all ${
                 activeTab === 'usuarios'
                   ? 'bg-indigo-600 text-white shadow-lg'
                   : darkMode
@@ -535,7 +535,7 @@ export default function EscolaDashboard() {
             </button>
             <button
               onClick={() => setActiveTab('alunos')}
-              className={`flex-1 py-3 px-4 rounded-xl font-semibold transition-all ${
+              className={`flex-1 py-2 sm:py-3 px-3 sm:px-4 rounded-xl text-sm sm:text-base font-semibold transition-all ${
                 activeTab === 'alunos'
                   ? 'bg-indigo-600 text-white shadow-lg'
                   : darkMode
@@ -547,7 +547,7 @@ export default function EscolaDashboard() {
             </button>
             <button
               onClick={() => setActiveTab('cadastrar')}
-              className={`flex-1 py-3 px-4 rounded-xl font-semibold transition-all ${
+              className={`flex-1 py-2 sm:py-3 px-3 sm:px-4 rounded-xl text-sm sm:text-base font-semibold transition-all ${
                 activeTab === 'cadastrar'
                   ? 'bg-indigo-600 text-white shadow-lg'
                   : darkMode
@@ -559,7 +559,7 @@ export default function EscolaDashboard() {
             </button>
             <button
               onClick={() => setActiveTab('estatisticas')}
-              className={`flex-1 py-3 px-4 rounded-xl font-semibold transition-all ${
+              className={`flex-1 py-2 sm:py-3 px-3 sm:px-4 rounded-xl text-sm sm:text-base font-semibold transition-all ${
                 activeTab === 'estatisticas'
                   ? 'bg-indigo-600 text-white shadow-lg'
                   : darkMode
@@ -574,10 +574,10 @@ export default function EscolaDashboard() {
 
         {/* Conteúdo das Tabs */}
         {activeTab === 'usuarios' && (
-          <div className={`rounded-3xl p-6 shadow-2xl transition-colors ${
+          <div className={`rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-2xl transition-colors ${
             darkMode ? 'bg-slate-800' : 'bg-white'
           }`}>
-            <h3 className={`text-2xl font-bold mb-4 transition-colors ${
+            <h3 className={`text-xl sm:text-2xl font-bold mb-4 transition-colors ${
               darkMode ? 'text-white' : 'text-slate-900'
             }`}>Usuários da Escola</h3>
 
@@ -674,14 +674,14 @@ export default function EscolaDashboard() {
         )}
 
         {activeTab === 'alunos' && (
-          <div className={`rounded-3xl p-6 shadow-2xl transition-colors ${
+          <div className={`rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-2xl transition-colors ${
             darkMode ? 'bg-slate-800' : 'bg-white'
           }`}>
-            <h3 className={`text-2xl font-bold mb-4 transition-colors ${
+            <h3 className={`text-xl sm:text-2xl font-bold mb-4 transition-colors ${
               darkMode ? 'text-white' : 'text-slate-900'
             }`}>Desempenho Individual dos Alunos</h3>
 
-            <div className="grid lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
               {/* Lista de Alunos */}
               <div className={`rounded-2xl p-4 transition-colors ${
                 darkMode ? 'bg-slate-700' : 'bg-slate-100'
@@ -774,7 +774,7 @@ export default function EscolaDashboard() {
                     </div>
 
                     {/* Cards de Estatísticas */}
-                    <div className="grid md:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
                       <div className={`rounded-xl p-4 transition-colors ${
                         darkMode ? 'bg-slate-700' : 'bg-slate-100'
                       }`}>
@@ -925,15 +925,15 @@ export default function EscolaDashboard() {
         )}
 
         {activeTab === 'cadastrar' && (
-          <div className={`rounded-3xl p-8 shadow-2xl transition-colors ${
+          <div className={`rounded-2xl sm:rounded-3xl p-4 sm:p-8 shadow-2xl transition-colors ${
             darkMode ? 'bg-slate-800' : 'bg-white'
           }`}>
-            <h3 className={`text-2xl font-bold mb-6 transition-colors ${
+            <h3 className={`text-xl sm:text-2xl font-bold mb-4 sm:mb-6 transition-colors ${
               darkMode ? 'text-white' : 'text-slate-900'
             }`}>Cadastrar Novo Usuário</h3>
 
-            <form onSubmit={handleSubmit} className="space-y-5">
-              <div className="grid md:grid-cols-2 gap-5">
+            <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-5">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
                 <div>
                   <label className={`block mb-2 font-medium text-sm ${
                     darkMode ? 'text-slate-400' : 'text-slate-700'
@@ -1062,9 +1062,9 @@ export default function EscolaDashboard() {
         )}
 
         {activeTab === 'estatisticas' && (
-          <div className="space-y-6">
+          <div className="space-y-4 sm:space-y-6">
             {/* Cards de estatísticas */}
-            <div className="grid md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
               <div className={`rounded-2xl p-6 shadow-xl transition-colors ${
                 darkMode ? 'bg-slate-800' : 'bg-white border border-slate-200'
               }`}>
@@ -1104,7 +1104,7 @@ export default function EscolaDashboard() {
             </div>
 
             {/* Segunda linha de cards */}
-            <div className="grid md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <div className={`rounded-2xl p-6 shadow-xl transition-colors ${
                 darkMode ? 'bg-slate-800' : 'bg-white border border-slate-200'
               }`}>
@@ -1128,7 +1128,7 @@ export default function EscolaDashboard() {
             </div>
 
             {/* Gráficos */}
-            <div className="grid md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
               <div className={`rounded-3xl p-6 shadow-2xl transition-colors ${
                 darkMode ? 'bg-slate-800' : 'bg-white border border-slate-200'
               }`}>

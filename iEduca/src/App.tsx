@@ -11,6 +11,8 @@ import RedacaoCorrecaoView from './pages/Aluno/Redacao/RedacaoCorrecaoView';
 import Ranking from './pages/Aluno/Ranking';
 import EscolaDashboard from './pages/Escola/Dashboard';
 import ProfessorDashboard from './pages/Professor/Dashboard';
+import GerenciarAtividades from './pages/Professor/GerenciarAtividades';
+import CorrigirRedacoes from './pages/Professor/CorrigirRedacoes';
 import PrivateRoute from './components/PrivateRoute';
 
 function App() {
@@ -21,6 +23,8 @@ function App() {
         <Route path="/cadastro" element={<Cadastro />} />
         <Route path="/escola/dashboard" element={<EscolaDashboard />} />
         <Route path="/professor/dashboard" element={<ProfessorDashboard />} />
+        <Route path="/professor/atividades" element={<GerenciarAtividades />} />
+        <Route path="/professor/redacoes" element={<CorrigirRedacoes />} />
         <Route path="/aluno/estudos" element={<Estudos />} />
         <Route path="/aluno/atividades" element={<Atividade />} />
         <Route path="/aluno/atividade/gerar-ia" element={<AtividadeIAPage />} />

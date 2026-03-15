@@ -7,7 +7,8 @@ import { NotificationDropdown, ProfileMenu } from '../../../components/Dashboard
 import { AlunoSidebar } from '../../../components/AlunoSidebar';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-// Limites por redação
+
+
 const MIN_CHARS = 4000;
 const MAX_CHARS = 6800;
 
@@ -223,13 +224,12 @@ export default function Redacao() {
 
   return (
     <>
-    <div className={`min-h-screen transition-colors duration-300 ${darkMode
+    <div className={`min-h-screen overflow-x-hidden transition-colors duration-300 ${darkMode
         ? 'bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900'
         : 'bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200'
       }`}>
       <AlunoSidebar darkMode={darkMode} onToggleTheme={() => setDarkMode(!darkMode)} />
 
-                    {/* Validation Popup */}
                     {validationPopup.visible && (
                       <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
                         <div className="absolute inset-0 bg-black/50" onClick={() => setValidationPopup({ ...validationPopup, visible: false })}></div>
@@ -274,21 +274,20 @@ export default function Redacao() {
                       </div>
                     )}
 
-      <div className="ml-52 min-h-screen flex flex-col">
-        {/* Header */}
-        <div className={`backdrop-blur-sm px-6 py-4 border-b flex justify-between items-center sticky top-0 z-40 transition-colors duration-300 ${darkMode
+      <div className="md:ml-52 min-h-screen flex flex-col">
+        <div className={`backdrop-blur-sm pl-14 pr-3 md:pl-6 md:pr-6 py-4 border-b flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4 sticky top-0 z-30 transition-colors duration-300 ${darkMode
             ? 'bg-slate-800/80 border-slate-700/50'
             : 'bg-white/90 border-slate-200 shadow-sm'
           }`}>
-          <div>
-            <h1 className={`text-xl font-bold mb-1 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+          <div className="flex-1">
+            <h1 className={`text-lg sm:text-xl font-bold mb-1 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
               ✍️ Redação ENEM
             </h1>
-            <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+            <p className={`text-xs sm:text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
               Pratique e receba correção detalhada por IA
             </p>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3 sm:gap-4 self-end sm:self-auto">
             <NotificationDropdown darkMode={darkMode} />
             <ProfileMenu
               user={user}
@@ -299,15 +298,12 @@ export default function Redacao() {
           </div>
         </div>
 
-        {/* Content Area */}
         <div className="flex-1">
           <div className={`flex-1 ${darkMode ? 'bg-slate-900' : 'bg-slate-50'}`}>
             <div className="max-w-7xl mx-auto px-6 py-8">
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Editor de Redação */}
                 <div className="lg:col-span-2">
                   <div className={`rounded-2xl shadow-lg border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
-                      {/* Header */}
                       <div className="p-6 border-b border-slate-200 dark:border-slate-700">
                         <div className="flex items-center gap-3 mb-4">
                           <span className="px-3 py-1 bg-orange-100 text-orange-700 text-xs font-bold rounded-full">
@@ -362,8 +358,6 @@ export default function Redacao() {
                           className={`w-full h-96 resize-none focus:outline-none font-serif text-base leading-relaxed ${darkMode ? 'bg-slate-800 text-white placeholder-slate-500' : 'bg-white text-slate-900 placeholder-slate-400'}`}
                         />
                       </div>
-
-                      {/* Footer */}
                       <div className={`p-4 border-t flex items-center justify-between ${darkMode ? 'border-slate-700' : 'border-slate-200'}`}>
                         <div className="flex items-center gap-6">
                           <div>
@@ -396,8 +390,6 @@ export default function Redacao() {
                       </div>
                     </div>
                   </div>
-
-                {/* Quick Tips */}
                 <div className="lg:col-span-1">
                   <div className={`rounded-2xl shadow-lg border p-6 ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
                       <div className="flex items-center gap-2 mb-6">
@@ -411,7 +403,6 @@ export default function Redacao() {
                       </p>
 
                       <div className="space-y-4">
-                        {/* COMP. 1 */}
                         <details className={`group ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                           <summary className="cursor-pointer list-none">
                             <div className="flex items-center justify-between p-3 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700">
@@ -428,8 +419,6 @@ export default function Redacao() {
                             Demonstre domínio da norma culta formal da língua portuguesa.
                           </p>
                         </details>
-
-                        {/* COMP. 2 */}
                         <details className={`group ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                           <summary className="cursor-pointer list-none">
                             <div className="flex items-center justify-between p-3 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700">
@@ -446,8 +435,6 @@ export default function Redacao() {
                             Entenda a proposta e aplique conceitos de diversas áreas do conhecimento.
                           </p>
                         </details>
-
-                        {/* COMP. 3 */}
                         <details className={`group ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                           <summary className="cursor-pointer list-none">
                             <div className="flex items-center justify-between p-3 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700">
@@ -464,8 +451,6 @@ export default function Redacao() {
                             Selecione, relacione, organize e interprete informações em defesa de um ponto de vista.
                           </p>
                         </details>
-
-                        {/* COMP. 4 */}
                         <details className={`group ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                           <summary className="cursor-pointer list-none">
                             <div className="flex items-center justify-between p-3 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700">
@@ -482,8 +467,6 @@ export default function Redacao() {
                             Demonstre conhecimento dos mecanismos linguísticos necessários para construir a argumentação.
                           </p>
                         </details>
-
-                        {/* COMP. 5 */}
                         <details className={`group ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                           <summary className="cursor-pointer list-none">
                             <div className="flex items-center justify-between p-3 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700">
@@ -504,8 +487,6 @@ export default function Redacao() {
                     </div>
                   </div>
                 </div>
-
-                {/* Ações */}
                 <div className="w-full mt-6 grid grid-cols-1 md:grid-cols-2 gap-3">
                   <button
                     onClick={handleSalvarRascunho}
@@ -530,7 +511,6 @@ export default function Redacao() {
           </div>
         </div>
       </div>
-
     </>
   );
 }

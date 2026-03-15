@@ -26,13 +26,23 @@ namespace ServiceIEDUCA.Services
                 {
                     await ProcessarCorrecoesPendentesAsync(stoppingToken);
                 }
+                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+                {
+                    break;
+                }
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Erro no processamento de correções em background");
                 }
 
-                // Aguardar 30 segundos antes de verificar novamente
-                await Task.Delay(TimeSpan.FromSeconds(30), stoppingToken);
+                try
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(30), stoppingToken);
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
             }
         }
 
@@ -42,7 +52,6 @@ namespace ServiceIEDUCA.Services
             var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var redacaoService = scope.ServiceProvider.GetRequiredService<IRedacaoCorrecaoService>();
 
-            // Buscar correções que estão travadas há mais de 5 minutos
             var correcoesTravadas = await context.RedacaoCorrecoes
                 .Where(r => r.Status == "Processando" && 
                            r.Progresso < 100 &&

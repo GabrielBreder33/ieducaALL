@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authService } from '../../../services/authService';
 import { aiService } from '../../../services/aiService';
+import { professorService } from '../../../services/professorService';
+import type { AtribuicaoAtividade } from '../../../services/professorService';
 import type { User } from '../../../types';
 import { NotificationDropdown, ProfileMenu } from '../../../components/Dashboard';
 import { AlunoSidebar } from '../../../components/AlunoSidebar';
@@ -48,6 +50,7 @@ export default function Atividade() {
   const [user, setUser] = useState<User | null>(null);
   const [darkMode, setDarkMode] = useState<boolean>(false);
   const [atividadesRealizadas, setAtividadesRealizadas] = useState<AtividadeRealizada[]>([]);
+  const [atividadesAtribuidas, setAtividadesAtribuidas] = useState<AtribuicaoAtividade[]>([]);
   const [carregandoHistorico, setCarregandoHistorico] = useState(true);
   const [materiaSelecionada, setMateriaSelecionada] = useState<number | null>(null);
 
@@ -110,12 +113,14 @@ export default function Atividade() {
     // Carregar histórico de atividades
     if (currentUser.id) {
       carregarHistorico(currentUser.id);
+      carregarAtribuidas(currentUser.id, currentUser.idEscola || 0);
     }
 
     // Recarregar histórico quando a página ganhar foco (volta da execução)
     const handleFocus = () => {
       if (currentUser.id) {
         carregarHistorico(currentUser.id);
+        carregarAtribuidas(currentUser.id, currentUser.idEscola || 0);
       }
     };
 
@@ -132,6 +137,15 @@ export default function Atividade() {
       console.error('Erro ao carregar histórico:', error);
     } finally {
       setCarregandoHistorico(false);
+    }
+  };
+
+  const carregarAtribuidas = async (userId: number, escolaId: number) => {
+    try {
+      const atribuidas = await professorService.listarAtribuicoesAluno(userId, escolaId);
+      setAtividadesAtribuidas(atribuidas);
+    } catch (error) {
+      console.error('Erro ao carregar atividades atribuídas:', error);
     }
   };
 
@@ -160,29 +174,29 @@ export default function Atividade() {
   }
 
   return (
-    <div className={`min-h-screen transition-colors duration-300 ${
+    <div className={`min-h-screen overflow-x-hidden transition-colors duration-300 ${
       darkMode
         ? 'bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900'
         : 'bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200'
     }`}>
       <AlunoSidebar darkMode={darkMode} onToggleTheme={() => setDarkMode(!darkMode)} />
 
-      <div className="ml-52 min-h-screen flex flex-col">
+      <div className="md:ml-52 min-h-screen flex flex-col">
         {/* Header */}
-        <div className={`backdrop-blur-sm px-6 py-4 border-b flex justify-between items-center sticky top-0 z-40 transition-colors duration-300 ${
+        <div className={`backdrop-blur-sm pl-14 pr-3 md:pl-6 md:pr-6 py-4 border-b flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4 sticky top-0 z-30 transition-colors duration-300 ${
           darkMode
             ? 'bg-slate-800/80 border-slate-700/50'
             : 'bg-white/90 border-slate-200 shadow-sm'
         }`}>
-          <div>
-            <h1 className={`text-xl font-bold mb-1 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+          <div className="flex-1">
+            <h1 className={`text-lg sm:text-xl font-bold mb-1 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
               Olá, {user.nome}!
             </h1>
-            <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+            <p className={`text-xs sm:text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
               Pronto para a jornada rumo aos 900+ no ENEM?
             </p>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3 sm:gap-4 self-end sm:self-auto">
             <NotificationDropdown darkMode={darkMode} />
             <ProfileMenu
               user={user}
@@ -194,7 +208,7 @@ export default function Atividade() {
         </div>
 
         {/* Main Content */}
-        <div className="flex-1 p-6">
+        <div className="flex-1 p-3 sm:p-4 md:p-6">
           <div className="max-w-7xl mx-auto">
             {/* Breadcrumb */}
             <div className={`text-sm mb-4 flex items-center gap-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
@@ -309,6 +323,86 @@ export default function Atividade() {
                     </div>
                   </div>
                 </div>
+
+                {/* Atividades Atribuídas pelo Professor */}
+                {atividadesAtribuidas.length > 0 && (
+                  <div className={`rounded-2xl border-2 border-indigo-400 p-6 ${
+                    darkMode ? 'bg-slate-800' : 'bg-white'
+                  }`}>
+                    <div className="flex items-center justify-between mb-5">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center">
+                          <span className="text-xl">👨‍🏫</span>
+                        </div>
+                        <div>
+                          <h3 className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                            Atividades do Professor
+                          </h3>
+                          <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                            Atividades atribuídas para você
+                          </p>
+                        </div>
+                      </div>
+                      <span className="px-3 py-1 rounded-full text-xs font-bold bg-indigo-100 text-indigo-700">
+                        {atividadesAtribuidas.length} {atividadesAtribuidas.length === 1 ? 'pendente' : 'pendentes'}
+                      </span>
+                    </div>
+
+                    <div className="space-y-3">
+                      {atividadesAtribuidas.map((atrib) => (
+                        <div
+                          key={atrib.id}
+                          className={`p-4 rounded-xl border-2 transition-all hover:shadow-lg ${
+                            darkMode
+                              ? 'bg-slate-700/50 border-slate-600 hover:border-indigo-500'
+                              : 'bg-indigo-50/50 border-indigo-200 hover:border-indigo-400'
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-2 flex-wrap">
+                                <h4 className={`font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                                  {atrib.atividadeNome}
+                                </h4>
+                                <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                                  atrib.atividadeTipo === 'Quiz' ? 'bg-blue-100 text-blue-700' :
+                                  atrib.atividadeTipo === 'Redação' ? 'bg-purple-100 text-purple-700' :
+                                  'bg-orange-100 text-orange-700'
+                                }`}>
+                                  {atrib.atividadeTipo}
+                                </span>
+                              </div>
+                              {atrib.instrucoes && (
+                                <p className={`text-sm mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+                                  {atrib.instrucoes}
+                                </p>
+                              )}
+                              <div className="flex items-center gap-4 text-xs flex-wrap">
+                                <span className={darkMode ? 'text-slate-400' : 'text-slate-500'}>
+                                  👨‍🏫 Prof. {atrib.professorNome}
+                                </span>
+                                {atrib.prazo && (
+                                  <span className="text-orange-600 font-medium">
+                                    ⏰ Prazo: {new Date(atrib.prazo).toLocaleDateString('pt-BR')}
+                                  </span>
+                                )}
+                                <span className={darkMode ? 'text-slate-400' : 'text-slate-500'}>
+                                  📅 {new Date(atrib.criadoEm).toLocaleDateString('pt-BR')}
+                                </span>
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => navigate(`/aluno/atividade/gerar-ia?atribuicaoId=${atrib.id}&atividadeId=${atrib.atividadeId}`)}
+                              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl transition-colors flex-shrink-0"
+                            >
+                              Iniciar
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 <div className={`rounded-2xl border p-6 ${
                   darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'

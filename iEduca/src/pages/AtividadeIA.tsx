@@ -41,7 +41,7 @@ export const AtividadeIAPage: React.FC = () => {
                             JSON.parse(localStorage.getItem('atividadeRefazer') || 'null');
     
     if (atividadeRefazer) {
-      console.log('🔄 Carregando atividade para refazer:', atividadeRefazer);
+      console.log(' Carregando atividade para refazer:', atividadeRefazer);
       setAtividadeAtual(atividadeRefazer);
       setEstado('respondendo');
       localStorage.removeItem('atividadeRefazer'); // Limpar depois de usar
@@ -111,29 +111,29 @@ export const AtividadeIAPage: React.FC = () => {
   }
 
   return (
-    <div className={`min-h-screen transition-colors duration-300 ${
+    <div className={`min-h-screen overflow-x-hidden transition-colors duration-300 ${
       darkMode
         ? 'bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900'
         : 'bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200'
     }`}>
       <AlunoSidebar darkMode={darkMode} onToggleTheme={() => setDarkMode(!darkMode)} />
 
-      <div className="ml-52 min-h-screen flex flex-col">
+      <div className="md:ml-52 min-h-screen flex flex-col">
         {/* Header */}
-        <div className={`backdrop-blur-sm px-6 py-4 border-b flex justify-between items-center sticky top-0 z-40 transition-colors duration-300 ${
+        <div className={`backdrop-blur-sm pl-14 pr-3 md:pl-6 md:pr-6 py-4 border-b flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4 sticky top-0 z-30 transition-colors duration-300 ${
           darkMode
             ? 'bg-slate-800/80 border-slate-700/50'
             : 'bg-white/90 border-slate-200 shadow-sm'
         }`}>
-          <div>
-            <h1 className={`text-xl font-bold mb-1 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+          <div className="flex-1">
+            <h1 className={`text-lg sm:text-xl font-bold mb-1 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
               🤖 Gerador de Atividades com IA
             </h1>
-            <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+            <p className={`text-xs sm:text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
               Crie atividades personalizadas em segundos
             </p>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3 sm:gap-4 self-end sm:self-auto">
             <NotificationDropdown darkMode={darkMode} />
             <ProfileMenu
               user={user}
@@ -145,7 +145,7 @@ export const AtividadeIAPage: React.FC = () => {
         </div>
 
         {/* Main Content */}
-        <div className="flex-1 p-6">
+        <div className="flex-1 p-3 sm:p-4 md:p-6">
           <div className="max-w-6xl mx-auto">
             {/* Breadcrumb */}
             <div className={`text-sm mb-6 flex items-center gap-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>

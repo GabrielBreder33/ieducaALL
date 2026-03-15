@@ -204,7 +204,7 @@ export const aiService = {
         notaTotal
       };
     } catch (error) {
-      console.error('❌ ERRO no stream de correção:', error);
+      console.error(' ERRO no stream de correção:', error);
       throw error;
     }
   },
@@ -237,7 +237,7 @@ export const aiService = {
 
       const correction: EssayCorrection = await response.json();
       
-      console.log('✅ Resposta do backend:', correction);
+      console.log(' Resposta do backend:', correction);
       
       if (correction.errosGramaticais) {
         correction.errosGramaticais = correction.errosGramaticais.map(erro => ({
@@ -252,7 +252,7 @@ export const aiService = {
       
       return correction;
     } catch (error) {
-      console.error('❌ ERRO ao corrigir redação:', error);
+      console.error(' ERRO ao corrigir redação:', error);
       // NÃO USE MOCK - Deixe o erro aparecer!
       throw error;
     }
@@ -483,7 +483,7 @@ export const aiService = {
 
       return atividadeFinal;
     } catch (error) {
-      console.error('❌ ERRO ao gerar atividade:', error);
+      console.error(' ERRO ao gerar atividade:', error);
       throw error;
     }
   },
@@ -643,7 +643,7 @@ Para cada questão:
       const resultado = await response.json();
       return resultado;
     } catch (error) {
-      console.error('❌ ERRO ao corrigir atividade:', error);
+      console.error(' ERRO ao corrigir atividade:', error);
       throw error;
     }
   },
@@ -664,7 +664,7 @@ Para cada questão:
       const historico = await response.json();
       return historico;
     } catch (error) {
-      console.error('❌ ERRO ao buscar histórico:', error);
+      console.error('ERRO ao buscar histórico:', error);
       throw error;
     }
   },
@@ -685,7 +685,7 @@ Para cada questão:
       const detalhe = await response.json();
       return detalhe;
     } catch (error) {
-      console.error('❌ ERRO ao buscar detalhes:', error);
+      console.error(' ERRO ao buscar detalhes:', error);
       throw error;
     }
   }

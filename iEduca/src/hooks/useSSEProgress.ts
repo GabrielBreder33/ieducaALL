@@ -65,14 +65,14 @@ export const useSSEProgress = (correcaoId: number | null) => {
         setError(null);
 
         if (data.status === 'concluida' || data.status === 'erro') {
-          console.log('✅ Status final alcançado:', data.status, '- Parando polling');
+          console.log(' Status final alcançado:', data.status, '- Parando polling');
           if (intervalRef.current) {
             clearInterval(intervalRef.current);
             intervalRef.current = null;
           }
         }
       } catch (err) {
-        console.error('❌ Erro ao buscar progresso:', err);
+        console.error(' Erro ao buscar progresso:', err);
         if (mountedRef.current) {
           setError('Erro ao conectar com o servidor');
           setIsConnected(false);

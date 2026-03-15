@@ -139,7 +139,7 @@ export default function Estudos() {
       ];
       
       setAtividadesRealizadas(todasAtividades);
-      console.log('📅 Atividades carregadas para o calendário:', {
+      console.log(' Atividades carregadas para o calendário:', {
         execucoes: execucoes.length,
         atividadesIA: atividadesIA.length,
         redacoes: redacoes.filter((r: any) => r.status === 'Concluída' || r.status === 'concluida').length,
@@ -366,26 +366,26 @@ export default function Estudos() {
   }
 
   return (
-    <div className={`min-h-screen transition-colors duration-300 ${darkMode
+    <div className={`min-h-screen overflow-x-hidden transition-colors duration-300 ${darkMode
         ? 'bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900'
         : 'bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200'
       }`}>
       <AlunoSidebar darkMode={darkMode} onToggleTheme={() => setDarkMode(!darkMode)} />
 
-      <div className="ml-52 min-h-screen flex flex-col">
-        <div className={`backdrop-blur-sm px-6 py-4 border-b flex justify-between items-center sticky top-0 z-40 transition-colors duration-300 ${darkMode
+      <div className="md:ml-52 min-h-screen flex flex-col overflow-x-hidden">
+        <div className={`backdrop-blur-sm pl-14 pr-3 md:pl-6 md:pr-6 py-4 border-b flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4 sticky top-0 z-30 transition-colors duration-300 ${darkMode
             ? 'bg-slate-800/80 border-slate-700/50'
             : 'bg-white/90 border-slate-200 shadow-sm'
           }`}>
-          <div>
-            <h1 className={`text-xl font-bold mb-1 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+          <div className="flex-1">
+            <h1 className={`text-lg sm:text-xl font-bold mb-1 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
               Olá, {user.nome}! 
             </h1>
-            <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+            <p className={`text-xs sm:text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
               Pronto para a jornada rumo aos 900+ no ENEM?
             </p>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3 sm:gap-4 self-end sm:self-auto">
             <NotificationDropdown darkMode={darkMode} />
             <ProfileMenu
               user={user}
@@ -400,31 +400,31 @@ export default function Estudos() {
         <div className="flex-1">
 
           {phase === 'config' && (
-            <div className="max-w-7xl mx-auto px-6 py-8">
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 py-4 sm:py-6 md:py-8 w-full overflow-x-hidden">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4 md:gap-6">
                 {/* Coluna Esquerda - Cards de Ação */}
-                <div className="lg:col-span-2 space-y-4">
+                <div className="lg:col-span-2 space-y-3 sm:space-y-4">
                   {/* Card Iniciar Redação */}
                   <div
                     onClick={() => navigate('/aluno/redacao')}
-                    className={`rounded-2xl p-6 shadow-lg cursor-pointer transition-all hover:shadow-xl hover:scale-[1.02] ${darkMode
+                    className={`rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-lg cursor-pointer transition-all hover:shadow-xl active:scale-[0.98] sm:hover:scale-[1.02] ${darkMode
                         ? 'bg-gradient-to-r from-blue-600 to-blue-700'
                         : 'bg-gradient-to-r from-blue-500 to-blue-600'
                       }`}
                   >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-4">
-                        <div className="bg-white/20 p-3 rounded-xl">
-                          <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
+                        <div className="bg-white/20 p-2 sm:p-3 rounded-lg sm:rounded-xl flex-shrink-0">
+                          <svg className="w-6 h-6 sm:w-8 sm:h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                           </svg>
                         </div>
-                        <div>
-                          <h3 className="text-xl font-bold text-white mb-1">Iniciar Redação</h3>
-                          <p className="text-blue-100 text-sm">Pratique com temas inéditos guiados por IA</p>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="text-base sm:text-xl font-bold text-white mb-1">Iniciar Redação</h3>
+                          <p className="text-blue-100 text-xs sm:text-sm">Pratique com temas inéditos guiados por IA</p>
                         </div>
                       </div>
-                      <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-5 h-5 sm:w-6 sm:h-6 text-white flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                       </svg>
                     </div>
@@ -433,35 +433,35 @@ export default function Estudos() {
                   {/* Card Lista de Atividades */}
                   <div
                     onClick={() => navigate('/aluno/atividades')}
-                    className={`rounded-2xl p-6 shadow-lg cursor-pointer transition-all hover:shadow-xl hover:scale-[1.02] border ${darkMode
+                    className={`rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-lg cursor-pointer transition-all hover:shadow-xl active:scale-[0.98] sm:hover:scale-[1.02] border ${darkMode
                         ? 'bg-slate-800/50 border-slate-700/50 hover:bg-slate-800/70'
                         : 'bg-white border-slate-200 hover:bg-slate-50'
                       }`}
                   >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-4">
-                        <div className={`p-3 rounded-xl ${darkMode ? 'bg-blue-600/20' : 'bg-blue-100'}`}>
-                          <svg className={`w-8 h-8 ${darkMode ? 'text-blue-400' : 'text-blue-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
+                        <div className={`p-2 sm:p-3 rounded-lg sm:rounded-xl flex-shrink-0 ${darkMode ? 'bg-blue-600/20' : 'bg-blue-100'}`}>
+                          <svg className={`w-6 h-6 sm:w-8 sm:h-8 ${darkMode ? 'text-blue-400' : 'text-blue-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                           </svg>
                         </div>
-                        <div>
-                          <h3 className={`text-xl font-bold mb-1 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                        <div className="flex-1 min-w-0">
+                          <h3 className={`text-base sm:text-xl font-bold mb-1 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                             Lista de Atividades
                           </h3>
-                          <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                          <p className={`text-xs sm:text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
                             Questões por áreas de conhecimento
                           </p>
                         </div>
                       </div>
-                      <svg className={`w-6 h-6 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className={`w-5 h-5 sm:w-6 sm:h-6 flex-shrink-0 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                       </svg>
                     </div>
                   </div>
 
                   {/* Meu Progresso - Calendário */}
-                  <div className={`rounded-2xl p-6 shadow-lg border ${darkMode
+                  <div className={`rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-lg border ${darkMode
                       ? 'bg-slate-800/50 border-slate-700/50'
                       : 'bg-white border-slate-200'
                     }`}>
@@ -473,13 +473,13 @@ export default function Estudos() {
                   </div>
                 </div>
 
-                <div className="space-y-4">
-                  <div className={`rounded-2xl p-6 shadow-lg border ${darkMode
+                <div className="space-y-3 sm:space-y-4">
+                  <div className={`rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-lg border ${darkMode
                       ? 'bg-slate-800/50 border-slate-700/50'
                       : 'bg-white border-slate-200'
                     }`}>
-                    <div className="flex items-center justify-between mb-6">
-                      <h3 className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                    <div className="flex items-center justify-between mb-4 sm:mb-6">
+                      <h3 className={`text-base sm:text-lg font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                         Estatísticas de Progresso
                       </h3>
                       <button className={`p-1 rounded hover:bg-slate-100 ${darkMode ? 'hover:bg-slate-700' : ''}`}>
@@ -490,83 +490,83 @@ export default function Estudos() {
                     </div>
 
                     {/* Total de Atividades */}
-                    <div className="mb-6">
+                    <div className="mb-4 sm:mb-6">
                       <div className="flex items-center justify-between mb-2">
-                        <span className={`font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                        <span className={`text-sm sm:text-base font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
                           Total de Atividades
                         </span>
-                        <span className={`font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                        <span className={`text-sm sm:text-base font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                           {estatisticas.totalAtividades}
                         </span>
                       </div>
-                      <div className="w-full bg-slate-200 rounded-full h-2 mb-1">
-                        <div className="bg-blue-600 h-2 rounded-full" style={{ width: estatisticas.totalAtividades > 0 ? '100%' : '0%' }}></div>
+                      <div className="w-full bg-slate-200 rounded-full h-1.5 sm:h-2 mb-1">
+                        <div className="bg-blue-600 h-1.5 sm:h-2 rounded-full" style={{ width: estatisticas.totalAtividades > 0 ? '100%' : '0%' }}></div>
                       </div>
-                      <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                      <p className={`text-xs sm:text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
                         {estatisticas.totalAtividades} concluída{estatisticas.totalAtividades !== 1 ? 's' : ''}
                       </p>
                     </div>
 
                     {/* Total de Acertos */}
-                    <div className="mb-6">
+                    <div className="mb-4 sm:mb-6">
                       <div className="flex items-center justify-between mb-2">
-                        <span className={`font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                        <span className={`text-sm sm:text-base font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
                           Total de Acertos
                         </span>
-                        <span className={`font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                        <span className={`text-sm sm:text-base font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                           {estatisticas.acertos + estatisticas.erros > 0 
                             ? `${Math.round((estatisticas.acertos / (estatisticas.acertos + estatisticas.erros)) * 100)}%`
                             : '0%'}
                         </span>
                       </div>
-                      <div className="w-full bg-slate-200 rounded-full h-2 mb-1">
-                        <div className="bg-blue-600 h-2 rounded-full" style={{ 
+                      <div className="w-full bg-slate-200 rounded-full h-1.5 sm:h-2 mb-1">
+                        <div className="bg-blue-600 h-1.5 sm:h-2 rounded-full" style={{ 
                           width: estatisticas.acertos + estatisticas.erros > 0 
                             ? `${(estatisticas.acertos / (estatisticas.acertos + estatisticas.erros)) * 100}%`
                             : '0%'
                         }}></div>
                       </div>
-                      <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                      <p className={`text-xs sm:text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
                         {estatisticas.acertos} questõe{estatisticas.acertos !== 1 ? 's' : ''}
                       </p>
                     </div>
 
                     {/* Média de Notas - Atividades */}
-                    <div className="mb-6">
+                    <div className="mb-4 sm:mb-6">
                       <div className="flex items-center justify-between mb-2">
-                        <span className={`font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                        <span className={`text-sm sm:text-base font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
                           Média - Lista de Atividades
                         </span>
-                        <span className={`font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                        <span className={`text-sm sm:text-base font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                           {(estatisticas.mediaNotasAtividades || 0).toFixed(1)}/10
                         </span>
                       </div>
-                      <div className="w-full bg-slate-200 rounded-full h-2 mb-1">
-                        <div className="bg-green-600 h-2 rounded-full" style={{ 
+                      <div className="w-full bg-slate-200 rounded-full h-1.5 sm:h-2 mb-1">
+                        <div className="bg-green-600 h-1.5 sm:h-2 rounded-full" style={{ 
                           width: estatisticas.mediaNotasAtividades > 0 ? `${(estatisticas.mediaNotasAtividades / 10) * 100}%` : '0%'
                         }}></div>
                       </div>
-                      <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                      <p className={`text-xs sm:text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
                         Escala de 0 a 10
                       </p>
                     </div>
 
                     {/* Média de Notas - Redações */}
-                    <div className="mb-6">
+                    <div className="mb-4 sm:mb-6">
                       <div className="flex items-center justify-between mb-2">
-                        <span className={`font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                        <span className={`text-sm sm:text-base font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
                           Média - Redações
                         </span>
-                        <span className={`font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                        <span className={`text-sm sm:text-base font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                           {(estatisticas.mediaNotasRedacoes || 0).toFixed(0)}/1000
                         </span>
                       </div>
-                      <div className="w-full bg-slate-200 rounded-full h-2 mb-1">
-                        <div className="bg-purple-600 h-2 rounded-full" style={{ 
+                      <div className="w-full bg-slate-200 rounded-full h-1.5 sm:h-2 mb-1">
+                        <div className="bg-purple-600 h-1.5 sm:h-2 rounded-full" style={{ 
                           width: estatisticas.mediaNotasRedacoes > 0 ? `${(estatisticas.mediaNotasRedacoes / 1000) * 100}%` : '0%'
                         }}></div>
                       </div>
-                      <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                      <p className={`text-xs sm:text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
                         Escala ENEM (0 a 1000)
                       </p>
                     </div>
@@ -574,21 +574,21 @@ export default function Estudos() {
                     {/* Tempo de Estudo */}
                     <div>
                       <div className="flex items-center justify-between mb-2">
-                        <span className={`font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                        <span className={`text-sm sm:text-base font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
                           Tempo de Estudo
                         </span>
-                        <span className={`font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                        <span className={`text-sm sm:text-base font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                           {estatisticas.tempoTotalSegundos > 0 
                             ? `${Math.floor(estatisticas.tempoTotalSegundos / 60)}min`
                             : '0min'}
                         </span>
                       </div>
-                      <div className="w-full bg-slate-200 rounded-full h-2 mb-1">
-                        <div className="bg-blue-600 h-2 rounded-full" style={{ 
+                      <div className="w-full bg-slate-200 rounded-full h-1.5 sm:h-2 mb-1">
+                        <div className="bg-blue-600 h-1.5 sm:h-2 rounded-full" style={{ 
                           width: estatisticas.tempoTotalSegundos > 0 ? `${Math.min((estatisticas.tempoTotalSegundos / 3600) * 100, 100)}%` : '0%'
                         }}></div>
                       </div>
-                      <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                      <p className={`text-xs sm:text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
                         {Math.floor(estatisticas.tempoTotalSegundos / 60)}min total
                       </p>
                     </div>
@@ -618,12 +618,12 @@ export default function Estudos() {
               </div>
 
               {showConfigModal && (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                  <div className={`rounded-2xl p-8 shadow-2xl max-w-2xl w-full border transition-colors ${darkMode
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-3 sm:p-4">
+                  <div className={`rounded-xl sm:rounded-2xl p-4 sm:p-6 md:p-8 shadow-2xl max-w-2xl w-full border transition-colors ${darkMode
                       ? 'bg-slate-800 border-slate-700'
                       : 'bg-white border-slate-200'
                     }`}>
-                    <h2 className={`text-2xl font-bold mb-6 ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>
+                    <h2 className={`text-xl sm:text-2xl font-bold mb-4 sm:mb-6 ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>
                       {activityType === 'redacao' ? '✍️ Configurar Redação' : '📚 Configurar Atividade'}
                     </h2>
                     <ConfigurationForm
@@ -645,7 +645,7 @@ export default function Estudos() {
                         setShowConfigModal(false);
                         setStudyTheme('');
                       }}
-                      className={`mt-4 w-full py-2 rounded-lg transition-colors ${darkMode
+                      className={`mt-3 sm:mt-4 w-full py-2 rounded-lg text-sm sm:text-base transition-colors ${darkMode
                           ? 'bg-slate-700 hover:bg-slate-600 text-white'
                           : 'bg-slate-200 hover:bg-slate-300 text-slate-800'
                         }`}

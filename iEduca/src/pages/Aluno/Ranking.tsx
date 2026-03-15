@@ -256,25 +256,25 @@ export default function Ranking() {
   };
 
   return (
-    <div className={`min-h-screen transition-colors duration-300 ${darkMode
+    <div className={`min-h-screen overflow-x-hidden transition-colors duration-300 ${darkMode
       ? 'bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900'
       : 'bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200'
     }`}>
       <AlunoSidebar darkMode={darkMode} onToggleTheme={() => setDarkMode(!darkMode)} />
 
-      <div className="ml-52 min-h-screen flex flex-col">
-        <header className={`backdrop-blur-sm px-6 py-4 border-b flex justify-between items-center sticky top-0 z-40 transition-colors duration-300 ${darkMode
+      <div className="md:ml-52 min-h-screen flex flex-col overflow-x-hidden">
+        <header className={`backdrop-blur-sm pl-14 pr-3 md:pl-6 md:pr-6 py-4 border-b flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sticky top-0 z-30 transition-colors duration-300 ${darkMode
           ? 'bg-slate-800/80 border-slate-700/50'
           : 'bg-white/90 border-slate-200 shadow-sm'
         }`}>
-          <div>
-            <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Comparativo em tempo real</p>
-            <h1 className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>Ranking de Alunos</h1>
-            <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+          <div className="flex-1">
+            <p className={`text-xs sm:text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Comparativo em tempo real</p>
+            <h1 className={`text-xl sm:text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>Ranking de Alunos</h1>
+            <p className={`text-xs sm:text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
               Acompanhe sua evolução frente à elite da plataforma.
             </p>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3 sm:gap-4 self-end sm:self-auto">
             <NotificationDropdown darkMode={darkMode} />
             <ProfileMenu user={user} darkMode={darkMode} onLogout={() => { authService.logout(); navigate('/login'); }} onUpdateUser={(data) => {
               const updatedUser = { ...user, ...data } as User;
@@ -284,30 +284,30 @@ export default function Ranking() {
           </div>
         </header>
 
-        <main className="flex-1 p-6">
-          <div className="max-w-6xl mx-auto space-y-6">
-            <div className={`rounded-3xl border px-4 py-3 flex flex-wrap gap-6 items-center justify-between ${darkMode ? 'bg-slate-900/60 border-slate-700' : 'bg-white border-slate-200'}`}>
-              <div>
-                <p className={`text-xs uppercase tracking-[0.4em] font-semibold ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+        <main className="flex-1 p-3 sm:p-4 md:p-6 overflow-x-hidden">
+          <div className="max-w-6xl mx-auto w-full space-y-4 sm:space-y-6">
+            <div className={`rounded-2xl sm:rounded-3xl border px-3 sm:px-4 py-3 flex flex-col sm:flex-row sm:flex-wrap gap-3 sm:gap-6 items-start sm:items-center justify-between max-w-full ${darkMode ? 'bg-slate-900/60 border-slate-700' : 'bg-white border-slate-200'}`}>
+              <div className="flex-1 min-w-[140px]">
+                <p className={`text-xs uppercase tracking-[0.2em] sm:tracking-[0.4em] font-semibold ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
                   Período de análise
                 </p>
-                <p className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>{periodLabels[periodo]}</p>
+                <p className={`text-base sm:text-lg font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>{periodLabels[periodo]}</p>
               </div>
-              <div>
-                <p className={`text-xs uppercase tracking-[0.3em] font-semibold ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+              <div className="flex-1 min-w-[140px]">
+                <p className={`text-xs uppercase tracking-[0.2em] sm:tracking-[0.3em] font-semibold ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
                   Escola
                 </p>
-                <p className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+                <p className={`text-base sm:text-lg font-bold truncate ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                   {rankingData?.escolaNome ?? 'Sem vínculo'}
                 </p>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
                 {(Object.keys(periodLabels) as RankingPeriod[]).map((option) => (
                   <button
                     key={option}
                     type="button"
                     onClick={() => setPeriodo(option)}
-                    className={`px-5 py-2 rounded-full text-sm font-semibold transition-all border ${option === periodo
+                    className={`px-3 sm:px-5 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-semibold transition-all border ${option === periodo
                       ? 'bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-500/30'
                       : darkMode
                         ? 'border-slate-700 text-slate-300 hover:bg-slate-800'
@@ -320,7 +320,7 @@ export default function Ranking() {
                 <button
                   type="button"
                   onClick={handleRetry}
-                  className={`px-4 py-2 rounded-full text-sm font-semibold transition-all ${darkMode
+                  className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-semibold transition-all ${darkMode
                     ? 'bg-slate-800 text-slate-200 hover:bg-slate-700'
                     : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                   }`}
@@ -331,22 +331,22 @@ export default function Ranking() {
             </div>
 
             {loading ? (
-              <div className={`rounded-3xl border p-10 text-center ${darkMode ? 'bg-slate-900/40 border-slate-700' : 'bg-white border-slate-200'}`}>
-                <div className="animate-spin w-12 h-12 rounded-full border-4 border-blue-200 border-t-blue-600 mx-auto mb-4" />
-                <p className={darkMode ? 'text-slate-400' : 'text-slate-600'}>Atualizando ranking...</p>
+              <div className={`rounded-2xl sm:rounded-3xl border p-6 sm:p-10 text-center ${darkMode ? 'bg-slate-900/40 border-slate-700' : 'bg-white border-slate-200'}`}>
+                <div className="animate-spin w-10 h-10 sm:w-12 sm:h-12 rounded-full border-4 border-blue-200 border-t-blue-600 mx-auto mb-4" />
+                <p className={`text-sm sm:text-base ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Atualizando ranking...</p>
               </div>
             ) : (
               <>
                 {error && (
-                  <div className={`rounded-3xl border p-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4 ${darkMode ? 'bg-rose-900/40 border-rose-700 text-rose-100' : 'bg-rose-50 border-rose-200 text-rose-900'}`}>
+                  <div className={`rounded-2xl sm:rounded-3xl border p-4 sm:p-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4 ${darkMode ? 'bg-rose-900/40 border-rose-700 text-rose-100' : 'bg-rose-50 border-rose-200 text-rose-900'}`}>
                     <div>
-                      <p className="text-lg font-semibold">Não foi possível carregar o ranking</p>
-                      <p className="text-sm opacity-80">{error}</p>
+                      <p className="text-base sm:text-lg font-semibold">Não foi possível carregar o ranking</p>
+                      <p className="text-xs sm:text-sm opacity-80">{error}</p>
                     </div>
                     <button
                       type="button"
                       onClick={handleRetry}
-                      className={`${darkMode ? 'bg-rose-700/80 text-white hover:bg-rose-600/80' : 'bg-rose-600 text-white hover:bg-rose-700'} px-5 py-2 rounded-full font-semibold transition`}
+                      className={`${darkMode ? 'bg-rose-700/80 text-white hover:bg-rose-600/80' : 'bg-rose-600 text-white hover:bg-rose-700'} px-4 sm:px-5 py-2 rounded-full text-sm sm:text-base font-semibold transition w-full sm:w-auto`}
                     >
                       Tentar novamente
                     </button>
@@ -354,15 +354,15 @@ export default function Ranking() {
                 )}
 
                 {!error && !hasData && (
-                  <div className={`rounded-3xl border p-8 text-center ${darkMode ? 'bg-slate-900/40 border-slate-700 text-slate-300' : 'bg-white border-slate-200 text-slate-600'}`}>
-                    <p className="text-lg font-semibold">Ainda não há dados para este período</p>
-                    <p className="text-sm mt-2">
+                  <div className={`rounded-2xl sm:rounded-3xl border p-6 sm:p-8 text-center ${darkMode ? 'bg-slate-900/40 border-slate-700 text-slate-300' : 'bg-white border-slate-200 text-slate-600'}`}>
+                    <p className="text-base sm:text-lg font-semibold">Ainda não há dados para este período</p>
+                    <p className="text-xs sm:text-sm mt-2">
                       Envie novas redações ou finalize atividades para entrar no ranking.
                     </p>
                     <button
                       type="button"
                       onClick={() => navigate('/aluno/estudos')}
-                      className="mt-4 px-5 py-2 rounded-full bg-blue-600 text-white font-semibold hover:bg-blue-700 transition"
+                      className="mt-4 px-4 sm:px-5 py-2 rounded-full bg-blue-600 text-white text-sm sm:text-base font-semibold hover:bg-blue-700 transition"
                     >
                       Ir para meus estudos
                     </button>
@@ -371,7 +371,7 @@ export default function Ranking() {
 
                 {!error && hasData && (
                   <>
-                    <section className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                    <section className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-5">
                       {podiumCards.map((student, index) => {
                         if (!student) {
                           return <div key={`podium-placeholder-${index}`} className="hidden md:block" aria-hidden="true" />;
@@ -381,38 +381,38 @@ export default function Ranking() {
                         return (
                           <div
                             key={student.position}
-                            className={`relative rounded-3xl border-2 p-6 text-center ${darkMode ? 'bg-slate-900' : 'bg-white'} ${accent.border} ${accent.glow}`}
+                            className={`relative rounded-2xl sm:rounded-3xl border-2 p-4 sm:p-6 text-center ${darkMode ? 'bg-slate-900' : 'bg-white'} ${accent.border} ${accent.glow}`}
                           >
-                            <div className="absolute -top-4 left-1/2 -translate-x-1/2">
-                              <span className={`px-4 py-1 rounded-full text-xs font-bold ${accent.badge}`}>
+                            <div className="absolute -top-3 sm:-top-4 left-1/2 -translate-x-1/2">
+                              <span className={`px-3 sm:px-4 py-1 rounded-full text-xs font-bold ${accent.badge}`}>
                                 #{student.position}
                               </span>
                             </div>
                             <img
                               src={student.avatar}
                               alt={student.name}
-                              className="w-24 h-24 rounded-full object-cover mx-auto mt-2 border-4 border-white shadow-lg"
+                              className="w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover mx-auto mt-2 border-4 border-white shadow-lg"
                             />
-                            <h3 className={`mt-4 text-xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>{student.name}</h3>
-                            <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                            <h3 className={`mt-3 sm:mt-4 text-lg sm:text-xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>{student.name}</h3>
+                            <p className={`text-xs sm:text-sm truncate ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                               {student.school}
                             </p>
                             <p className={`text-xs mt-1 ${darkMode ? 'text-slate-500' : 'text-slate-500'}`}>
                               {student.summary}
                             </p>
-                            <div className={`mt-5 rounded-2xl p-4 ${darkMode ? 'bg-slate-800' : 'bg-blue-50'}`}>
-                              <p className={`text-xs uppercase tracking-[0.4em] font-semibold ${darkMode ? 'text-slate-400' : 'text-blue-500'}`}>
+                            <div className={`mt-4 sm:mt-5 rounded-xl sm:rounded-2xl p-3 sm:p-4 ${darkMode ? 'bg-slate-800' : 'bg-blue-50'}`}>
+                              <p className={`text-xs uppercase tracking-[0.2em] sm:tracking-[0.4em] font-semibold ${darkMode ? 'text-slate-400' : 'text-blue-500'}`}>
                                 Média geral
                               </p>
-                              <p className={`text-4xl font-black ${darkMode ? 'text-white' : 'text-blue-600'}`}>{student.average}</p>
+                              <p className={`text-3xl sm:text-4xl font-black ${darkMode ? 'text-white' : 'text-blue-600'}`}>{student.average}</p>
                             </div>
                           </div>
                         );
                       })}
                     </section>
 
-                    <section className={`rounded-3xl border ${darkMode ? 'bg-slate-900/70 border-slate-700' : 'bg-white border-slate-200'} overflow-hidden`}>
-                      <div className="grid grid-cols-12 px-6 py-4 text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">
+                    <section className={`rounded-2xl sm:rounded-3xl border ${darkMode ? 'bg-slate-900/70 border-slate-700' : 'bg-white border-slate-200'} overflow-hidden`}>
+                      <div className="hidden md:grid grid-cols-12 px-4 sm:px-6 py-4 text-xs font-semibold uppercase tracking-[0.2em] sm:tracking-[0.3em] text-slate-400">
                         <span className="col-span-2">Posição</span>
                         <span className="col-span-3">Estudante</span>
                         <span className="col-span-2">Redações</span>
@@ -423,27 +423,27 @@ export default function Ranking() {
                         {leaderboard.map((entry) => (
                           <div
                             key={entry.position}
-                            className={`grid grid-cols-12 items-center px-6 py-5 border-t ${darkMode ? 'border-slate-800/80' : 'border-slate-100'} ${darkMode ? 'text-white' : 'text-slate-900'}`}
+                            className={`grid grid-cols-1 md:grid-cols-12 gap-3 md:gap-0 items-start md:items-center px-4 sm:px-6 py-4 sm:py-5 border-t ${darkMode ? 'border-slate-800/80' : 'border-slate-100'} ${darkMode ? 'text-white' : 'text-slate-900'}`}
                           >
-                            <div className="col-span-2 flex items-center gap-3">
-                              <span className="text-lg font-black text-blue-500">#{entry.position}</span>
+                            <div className="md:col-span-2 flex items-center gap-3">
+                              <span className="text-base sm:text-lg font-black text-blue-500">#{entry.position}</span>
                             </div>
-                            <div className="col-span-3 flex items-center gap-3">
-                              <div className="w-10 h-10 rounded-2xl bg-blue-100 text-blue-600 font-bold flex items-center justify-center">
+                            <div className="md:col-span-3 flex items-center gap-3">
+                              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-blue-100 text-blue-600 font-bold flex items-center justify-center text-sm sm:text-base">
                                 {entry.initials}
                               </div>
-                              <div>
-                                <p className="font-semibold">{entry.name}</p>
-                                <p className="text-xs text-slate-500">{entry.detail}</p>
+                              <div className="flex-1 min-w-0">
+                                <p className="font-semibold text-sm sm:text-base truncate">{entry.name}</p>
+                                <p className="text-xs text-slate-500 truncate">{entry.detail}</p>
                               </div>
                             </div>
-                            <div className="col-span-2 text-sm text-slate-500">
+                            <div className="md:col-span-2 text-xs sm:text-sm text-slate-500">
                               {entry.essays} enviadas
                             </div>
-                            <div className="col-span-3">
+                            <div className="md:col-span-3">
                               {renderProgressBar(entry)}
                             </div>
-                            <div className="col-span-2 text-right text-xl font-black">
+                            <div className="md:col-span-2 text-left md:text-right text-lg sm:text-xl font-black">
                               {entry.average}
                             </div>
                           </div>
@@ -452,51 +452,51 @@ export default function Ranking() {
                     </section>
 
                     {userSummary ? (
-                      <section className="rounded-3xl bg-gradient-to-r from-blue-600 to-blue-700 text-white p-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4 shadow-2xl">
-                        <div className="flex items-center gap-4">
-                          <div className="text-2xl font-black">#{userSummary.position}</div>
-                          <div>
-                            <p className="text-sm uppercase tracking-[0.3em] font-semibold opacity-80">Sua posição</p>
-                            <p className="text-base font-medium">{userSummary.highlight}</p>
-                            <p className="text-xs opacity-80">{userSummary.deltaLabel}</p>
+                      <section className="rounded-2xl sm:rounded-3xl bg-gradient-to-r from-blue-600 to-blue-700 text-white p-4 sm:p-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4 shadow-2xl">
+                        <div className="flex items-center gap-3 sm:gap-4">
+                          <div className="text-xl sm:text-2xl font-black">#{userSummary.position}</div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs uppercase tracking-[0.2em] sm:tracking-[0.3em] font-semibold opacity-80">Sua posição</p>
+                            <p className="text-sm sm:text-base font-medium">{userSummary.highlight}</p>
+                            <p className="text-xs opacity-80 truncate">{userSummary.deltaLabel}</p>
                           </div>
                         </div>
-                        <div className="flex items-center gap-8 text-center">
+                        <div className="flex items-center gap-6 sm:gap-8 text-center">
                           <div>
-                            <p className="text-xs uppercase tracking-[0.3em] opacity-80">Média</p>
-                            <p className="text-3xl font-black">{userSummary.average}</p>
+                            <p className="text-xs uppercase tracking-[0.2em] sm:tracking-[0.3em] opacity-80">Média</p>
+                            <p className="text-2xl sm:text-3xl font-black">{userSummary.average}</p>
                           </div>
                           <div>
-                            <p className="text-xs uppercase tracking-[0.3em] opacity-80">Redações</p>
-                            <p className="text-3xl font-black">{userSummary.essays}</p>
+                            <p className="text-xs uppercase tracking-[0.2em] sm:tracking-[0.3em] opacity-80">Redações</p>
+                            <p className="text-2xl sm:text-3xl font-black">{userSummary.essays}</p>
                           </div>
                         </div>
                         <button
                           type="button"
                           onClick={() => navigate('/aluno/estudos')}
-                          className="px-6 py-3 rounded-2xl bg-white/15 hover:bg-white/25 transition font-semibold"
+                          className="px-4 sm:px-6 py-2 sm:py-3 rounded-xl sm:rounded-2xl bg-white/15 hover:bg-white/25 transition font-semibold text-sm sm:text-base w-full md:w-auto"
                         >
                           Ver desempenho completo →
                         </button>
                       </section>
                     ) : (
-                      <section className={`rounded-3xl border p-6 ${darkMode ? 'bg-slate-900/50 border-slate-800 text-slate-200' : 'bg-white border-slate-200 text-slate-700'}`}>
-                        <p className="text-lg font-semibold">Você ainda não aparece no ranking deste período</p>
-                        <p className="text-sm mt-2">
+                      <section className={`rounded-2xl sm:rounded-3xl border p-4 sm:p-6 ${darkMode ? 'bg-slate-900/50 border-slate-800 text-slate-200' : 'bg-white border-slate-200 text-slate-700'}`}>
+                        <p className="text-base sm:text-lg font-semibold">Você ainda não aparece no ranking deste período</p>
+                        <p className="text-xs sm:text-sm mt-2">
                           Complete novas atividades e redações para desbloquear sua posição.
                         </p>
-                        <div className="mt-4 flex flex-wrap gap-3">
+                        <div className="mt-4 flex flex-col sm:flex-row flex-wrap gap-3">
                           <button
                             type="button"
                             onClick={() => navigate('/aluno/estudos')}
-                            className="px-5 py-2 rounded-full bg-blue-600 text-white font-semibold hover:bg-blue-700 transition"
+                            className="px-4 sm:px-5 py-2 rounded-full bg-blue-600 text-white text-sm sm:text-base font-semibold hover:bg-blue-700 transition w-full sm:w-auto"
                           >
                             Planejar estudos
                           </button>
                           <button
                             type="button"
                             onClick={handleRetry}
-                            className={`px-5 py-2 rounded-full font-semibold ${darkMode ? 'bg-slate-800 text-slate-100 hover:bg-slate-700' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
+                            className={`px-4 sm:px-5 py-2 rounded-full text-sm sm:text-base font-semibold w-full sm:w-auto ${darkMode ? 'bg-slate-800 text-slate-100 hover:bg-slate-700' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
                           >
                             Atualizar agora
                           </button>

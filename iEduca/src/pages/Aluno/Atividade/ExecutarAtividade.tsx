@@ -166,12 +166,12 @@ export default function ExecutarAtividade() {
         atividade
       );
       
-      console.log('✅ Atividade salva com sucesso!');
+      console.log(' Atividade salva com sucesso!');
       
       // Navegar para resultado
       navigate('/aluno/atividades');
     } catch (error) {
-      console.error('❌ Erro ao salvar atividade:', error);
+      console.error(' Erro ao salvar atividade:', error);
       alert('Erro ao salvar atividade. Por favor, tente novamente.');
       setRespondendo(true);
     } finally {
@@ -241,24 +241,24 @@ if (carregando) {
   console.log('============================');
 
   return (
-    <div className={`min-h-screen transition-colors duration-300 ${
+    <div className={`min-h-screen overflow-x-hidden transition-colors duration-300 ${
       darkMode
         ? 'bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900'
         : 'bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200'
     }`}>
       <AlunoSidebar darkMode={darkMode} onToggleTheme={() => setDarkMode(!darkMode)} />
 
-      <div className="ml-52 min-h-screen flex flex-col">
+      <div className="md:ml-52 min-h-screen flex flex-col">
         {/* Header */}
-        <div className={`backdrop-blur-sm px-6 py-4 border-b flex justify-between items-center sticky top-0 z-40 transition-colors duration-300 ${
+        <div className={`backdrop-blur-sm pl-14 pr-3 md:pl-6 md:pr-6 py-4 border-b flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4 sticky top-0 z-30 transition-colors duration-300 ${
           darkMode
             ? 'bg-slate-800/80 border-slate-700/50'
             : 'bg-white/90 border-slate-200 shadow-sm'
         }`}>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3 sm:gap-4 flex-1">
             <button
               onClick={() => navigate('/aluno/atividades')}
-              className={`p-2 rounded-lg transition-colors ${
+              className={`p-1.5 sm:p-2 rounded-lg transition-colors flex-shrink-0 ${
                 darkMode ? 'hover:bg-slate-700' : 'hover:bg-slate-100'
               }`}
             >
@@ -266,16 +266,16 @@ if (carregando) {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
             </button>
-            <div>
-              <h1 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+            <div className="flex-1 min-w-0">
+              <h1 className={`text-base sm:text-xl font-bold truncate ${darkMode ? 'text-white' : 'text-slate-900'}`}>
                 {atividade.configuracao?.conteudo || 'Atividade'}
               </h1>
-              <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+              <p className={`text-xs sm:text-sm truncate ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
                 {atividade.configuracao?.materia || 'Matéria'} • Nível {atividade.configuracao?.nivel || 'Médio'}
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-4 self-end sm:self-auto">
             <div className={`flex items-center gap-2 px-4 py-2 rounded-lg ${
               darkMode ? 'bg-slate-700' : 'bg-slate-100'
             }`}>

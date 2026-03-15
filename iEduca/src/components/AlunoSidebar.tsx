@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 
 type NavItem = {
@@ -80,6 +81,7 @@ const baseButtonClasses = 'w-full flex items-center gap-3 px-4 py-3 rounded-xl f
 export function AlunoSidebar({ darkMode, onToggleTheme }: AlunoSidebarProps) {
   const location = useLocation();
   const navigate = useNavigate();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const activeRoute = location.pathname;
 
@@ -101,56 +103,118 @@ export function AlunoSidebar({ darkMode, onToggleTheme }: AlunoSidebarProps) {
 
   const handleNavigate = (item: NavItem) => {
     if (!item.route) return;
-    if (activeRoute === item.route) return;
+    if (activeRoute === item.route) {
+      setMobileMenuOpen(false);
+      return;
+    }
     navigate(item.route);
+    setMobileMenuOpen(false);
+  };
+
+  const closeMobileMenu = () => {
+    setMobileMenuOpen(false);
   };
 
   return (
-    <aside
-      className={`fixed left-0 top-0 h-screen w-52 border-r transition-colors duration-300 flex flex-col ${darkMode
-        ? 'bg-slate-900/50 border-slate-700/50'
-        : 'bg-white border-slate-200'
-      }`}
-    >
-      <div className="p-6 flex-shrink-0">
-        <div className="flex items-center gap-2 mb-8">
-          <h1 className="text-xl font-bold text-blue-600">IEDUCA</h1>
+    <>
+      {/* Botão Hamburguer - Visível apenas em mobile */}
+      <button
+        type="button"
+        onClick={() => setMobileMenuOpen(true)}
+        className={`fixed top-4 left-4 z-50 md:hidden p-2 rounded-xl transition-all ${
+          darkMode
+            ? 'bg-slate-800/90 text-white hover:bg-slate-700'
+            : 'bg-white/90 text-slate-900 hover:bg-slate-100'
+        } backdrop-blur-sm shadow-lg border ${
+          darkMode ? 'border-slate-700' : 'border-slate-200'
+        }`}
+      >
+        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+        </svg>
+      </button>
+
+      {/* Backdrop para Mobile */}
+      {mobileMenuOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 md:hidden transition-opacity"
+          onClick={closeMobileMenu}
+        />
+      )}
+
+      {/* Sidebar */}
+      <aside
+        className={`fixed left-0 top-0 h-screen w-72 border-r transition-all duration-300 flex flex-col z-50 ${
+          darkMode
+            ? 'bg-slate-900/95 border-slate-700/50'
+            : 'bg-white/95 border-slate-200'
+        } backdrop-blur-md
+        ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+        md:w-52
+        `}
+      >
+        {/* Header do Sidebar */}
+        <div className="p-4 sm:p-6 flex-shrink-0">
+          <div className="flex items-center justify-between mb-6 sm:mb-8">
+            <div className="flex items-center gap-2">
+              <h1 className="text-lg sm:text-xl font-bold text-blue-600">IEDUCA</h1>
+            </div>
+            {/* Botão Fechar - Visível apenas em mobile */}
+            <button
+              type="button"
+              onClick={closeMobileMenu}
+              className={`md:hidden p-2 rounded-lg transition-colors ${
+                darkMode
+                  ? 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+              }`}
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          <nav className="space-y-1.5 sm:space-y-2">
+            {navItems.map((item) => {
+              const active = isActive(item);
+              return (
+                <button
+                  key={item.label}
+                  type="button"
+                  onClick={() => handleNavigate(item)}
+                  className={getButtonClasses(active)}
+                  disabled={!item.route}
+                  aria-disabled={!item.route}
+                >
+                  {item.icon}
+                  {item.label}
+                </button>
+              );
+            })}
+          </nav>
         </div>
 
-        <nav className="space-y-2">
-          {navItems.map((item) => {
-            const active = isActive(item);
-            return (
-              <button
-                key={item.label}
-                type="button"
-                onClick={() => handleNavigate(item)}
-                className={getButtonClasses(active)}
-                disabled={!item.route}
-                aria-disabled={!item.route}
-              >
-                {item.icon}
-                {item.label}
-              </button>
-            );
-          })}
-        </nav>
-      </div>
-
-      <div className="mt-auto p-6 flex-shrink-0">
-        <button
-          type="button"
-          onClick={onToggleTheme}
-          className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors border-2 ${darkMode
-            ? 'text-slate-400 hover:bg-slate-800 hover:text-white border-slate-700'
-            : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 border-slate-300'
-          }`}
-        >
-          <span className="text-xl">{darkMode ? '🌙' : '☀️'}</span>
-          Alternar Tema
-        </button>
-      </div>
-    </aside>
+        {/* Botão de Tema */}
+        <div className="mt-auto p-4 sm:p-6 flex-shrink-0">
+          <button
+            type="button"
+            onClick={() => {
+              onToggleTheme();
+              closeMobileMenu();
+            }}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors border-2 ${
+              darkMode
+                ? 'text-slate-400 hover:bg-slate-800 hover:text-white border-slate-700'
+                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 border-slate-300'
+            }`}
+          >
+            <span className="text-xl">{darkMode ? '🌙' : '☀️'}</span>
+            Alternar Tema
+          </button>
+        </div>
+      </aside>
+    </>
   );
 }
 

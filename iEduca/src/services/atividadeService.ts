@@ -60,8 +60,8 @@ class AtividadeService {
   // Iniciar uma nova atividade
   async iniciarAtividade(data: AtividadeExecucaoCreate): Promise<AtividadeExecucao> {
     try {
-      console.log('🌐 Fazendo requisição para:', `${API_URL}/AtividadeExecucoes/iniciar`);
-      console.log('📦 Dados:', data);
+      console.log(' Fazendo requisição para:', `${API_URL}/AtividadeExecucoes/iniciar`);
+      console.log(' Dados:', data);
       
       const response = await fetch(`${API_URL}/AtividadeExecucoes/iniciar`, {
         method: 'POST',
@@ -73,14 +73,14 @@ class AtividadeService {
 
       if (!response.ok) {
         const error = await response.text();
-        console.error('❌ Erro da API:', error);
+        console.error(' Erro da API:', error);
         throw new Error(error || `Erro HTTP: ${response.status}`);
       }
 
       const result = await response.json();
       return result;
     } catch (error: any) {
-      console.error('🔥 Erro capturado:', error);
+      console.error(' Erro capturado:', error);
       if (error.message?.includes('fetch')) {
         throw new Error('Não foi possível conectar ao servidor. Verifique se o backend está rodando.');
       }

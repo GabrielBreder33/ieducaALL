@@ -26,6 +26,11 @@ namespace ServiceIEDUCA.Data
         public DbSet<RedacaoPropostaIntervencao> RedacaoPropostaIntervencao { get; set; }
         public DbSet<RedacaoCustos> RedacaoCustos { get; set; }
 
+        // Professor
+        public DbSet<AtividadeAtribuicao> AtividadeAtribuicoes { get; set; }
+        public DbSet<ProfessorRedacaoRevisao> ProfessorRedacaoRevisoes { get; set; }
+        public DbSet<ProfessorCompetenciaRevisao> ProfessorCompetenciaRevisoes { get; set; }
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -127,6 +132,51 @@ namespace ServiceIEDUCA.Data
             {
                 entity.Property(e => e.NotaTotal)
                     .HasColumnType("int");
+            });
+
+            // Configuração: AtividadeAtribuicao
+            modelBuilder.Entity<AtividadeAtribuicao>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Status).HasMaxLength(30).HasDefaultValue("Ativa");
+                entity.Property(e => e.CriadoEm).HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                entity.HasIndex(e => new { e.ProfessorId, e.EscolaId })
+                    .HasDatabaseName("IX_AtividadeAtribuicoes_ProfessorId_EscolaId");
+
+                entity.HasIndex(e => new { e.AlunoId, e.Status })
+                    .HasDatabaseName("IX_AtividadeAtribuicoes_AlunoId_Status");
+            });
+
+            // Configuração: ProfessorRedacaoRevisao
+            modelBuilder.Entity<ProfessorRedacaoRevisao>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.CriadoEm).HasDefaultValueSql("CURRENT_TIMESTAMP");
+                entity.Property(e => e.NotaTotalProfessor).HasColumnType("decimal(7,2)");
+
+                entity.HasIndex(e => e.RedacaoCorrecaoId)
+                    .IsUnique()
+                    .HasDatabaseName("IX_ProfessorRedacaoRevisoes_RedacaoCorrecaoId");
+
+                entity.HasIndex(e => e.ProfessorId)
+                    .HasDatabaseName("IX_ProfessorRedacaoRevisoes_ProfessorId");
+            });
+
+            // Configuração: ProfessorCompetenciaRevisao
+            modelBuilder.Entity<ProfessorCompetenciaRevisao>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.CriadoEm).HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                entity.HasOne(e => e.Revisao)
+                    .WithMany(r => r.CompetenciaRevisoes)
+                    .HasForeignKey(e => e.RevisaoId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasIndex(e => new { e.RevisaoId, e.NumeroCompetencia })
+                    .IsUnique()
+                    .HasDatabaseName("IX_ProfessorCompetenciaRevisoes_RevisaoId_Numero");
             });
 
             modelBuilder.Entity<RedacaoCustos>(entity =>
