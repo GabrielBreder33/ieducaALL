@@ -10,7 +10,6 @@ export default function Login() {
   const [error, setError] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
   const [loginType, setLoginType] = useState<'user' | 'escola'>('user');
-  const [darkMode, setDarkMode] = useState<boolean>(false);
   const navigate = useNavigate();
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
@@ -21,7 +20,7 @@ export default function Login() {
     try {
       if (loginType === 'escola') {
         // Login como escola
-        const escola = await escolaService.login(email, password);
+        await escolaService.login(email, password);
         navigate('/escola/dashboard');
       } else {
         // Login como usuário

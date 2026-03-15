@@ -30,6 +30,7 @@ namespace ServiceIEDUCA.Data
         public DbSet<AtividadeAtribuicao> AtividadeAtribuicoes { get; set; }
         public DbSet<ProfessorRedacaoRevisao> ProfessorRedacaoRevisoes { get; set; }
         public DbSet<ProfessorCompetenciaRevisao> ProfessorCompetenciaRevisoes { get; set; }
+        public DbSet<ProfessorRedacaoGrifo> ProfessorRedacaoGrifos { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -177,6 +178,23 @@ namespace ServiceIEDUCA.Data
                 entity.HasIndex(e => new { e.RevisaoId, e.NumeroCompetencia })
                     .IsUnique()
                     .HasDatabaseName("IX_ProfessorCompetenciaRevisoes_RevisaoId_Numero");
+            });
+
+            // Configuração: ProfessorRedacaoGrifo
+            modelBuilder.Entity<ProfessorRedacaoGrifo>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.CriadoEm).HasDefaultValueSql("CURRENT_TIMESTAMP");
+                entity.Property(e => e.Cor).HasMaxLength(30).HasDefaultValue("yellow");
+                entity.Property(e => e.Comentario).HasMaxLength(500);
+
+                entity.HasOne(e => e.Revisao)
+                    .WithMany(r => r.Grifos)
+                    .HasForeignKey(e => e.RevisaoId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasIndex(e => e.RevisaoId)
+                    .HasDatabaseName("IX_ProfessorRedacaoGrifos_RevisaoId");
             });
 
             modelBuilder.Entity<RedacaoCustos>(entity =>

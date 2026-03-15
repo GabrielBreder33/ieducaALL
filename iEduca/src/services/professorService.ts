@@ -64,6 +64,21 @@ export interface AtualizarRevisaoRedacao {
   competencias?: CompetenciaRevisaoItem[];
 }
 
+export interface GrifoItem {
+  posicaoInicio: number;
+  posicaoFim: number;
+  cor: string;
+  comentario?: string;
+}
+
+export interface GrifoResponse {
+  id: number;
+  posicaoInicio: number;
+  posicaoFim: number;
+  cor: string;
+  comentario?: string;
+}
+
 export interface ProfessorRedacaoRevisao {
   id: number;
   redacaoCorrecaoId: number;
@@ -76,6 +91,7 @@ export interface ProfessorRedacaoRevisao {
   criadoEm: string;
   atualizadoEm?: string;
   competencias: CompetenciaRevisaoItem[];
+  grifos?: GrifoResponse[];
 }
 
 export interface RedacaoDetalhada {
@@ -206,6 +222,27 @@ class ProfessorService {
       const err = await response.json().catch(() => ({}));
       throw new Error(err.message || 'Erro ao atualizar revisão');
     }
+    return response.json();
+  }
+
+  // --- Grifos ---
+
+  async salvarGrifos(redacaoCorrecaoId: number, professorId: number, grifos: GrifoItem[]): Promise<GrifoResponse[]> {
+    const response = await fetch(`${API_URL}/Professor/redacoes/grifos`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ redacaoCorrecaoId, professorId, grifos }),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.message || 'Erro ao salvar grifos');
+    }
+    return response.json();
+  }
+
+  async obterGrifos(redacaoCorrecaoId: number): Promise<GrifoResponse[]> {
+    const response = await fetch(`${API_URL}/Professor/redacoes/grifos/${redacaoCorrecaoId}`);
+    if (!response.ok) throw new Error('Erro ao obter grifos');
     return response.json();
   }
 }

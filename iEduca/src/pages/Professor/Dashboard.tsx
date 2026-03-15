@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { authService } from '../../services/authService';
 import type { User } from '../../types';
 import { NotificationDropdown, ProfileMenu } from '../../components/Dashboard';
-import Calendar from '../../components/Dashboard/Calendar';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -16,7 +15,7 @@ import {
   Legend,
   ArcElement,
 } from 'chart.js';
-import { Line, Doughnut } from 'react-chartjs-2';
+import EstatisticasAluno from './components/EstatisticasAluno';
 
 ChartJS.register(
   CategoryScale,
@@ -136,28 +135,6 @@ export default function ProfessorDashboard() {
     }
   };
 
-  // Dados para gráficos
-  const dadosEvolucao = {
-    labels: estatisticas?.ultimasAtividades.slice(-10).map((_, i) => `Atv ${i + 1}`) || [],
-    datasets: [{
-      label: 'Nota (%)',
-      data: estatisticas?.ultimasAtividades.slice(-10).map(a => a.nota) || [],
-      borderColor: 'rgb(99, 102, 241)',
-      backgroundColor: 'rgba(99, 102, 241, 0.1)',
-      tension: 0.4,
-    }],
-  };
-
-  const dadosAcertosErros = {
-    labels: ['Acertos', 'Erros'],
-    datasets: [{
-      data: [estatisticas?.acertos || 0, estatisticas?.erros || 0],
-      backgroundColor: ['rgba(34, 197, 94, 0.8)', 'rgba(239, 68, 68, 0.8)'],
-      borderColor: ['rgb(34, 197, 94)', 'rgb(239, 68, 68)'],
-      borderWidth: 2,
-    }],
-  };
-
   if (!professor) return null;
 
   return (
@@ -177,41 +154,6 @@ export default function ProfessorDashboard() {
           }`}>IEDUCA</h1>
         </div>
 
-        {/* Theme Toggle - Centro */}
-        <div className={`hidden sm:flex items-center gap-3 rounded-full p-1.5 transition-colors ${
-          darkMode ? 'bg-slate-700/50' : 'bg-slate-200'
-        }`}>
-          <button 
-            onClick={() => setDarkMode(false)}
-            className={`p-2 rounded-full transition-all ${
-              !darkMode ? 'bg-white shadow-lg text-yellow-500' : 'text-slate-400 hover:bg-slate-600'
-            }`}
-          >
-            ☀️
-          </button>
-          <div className="relative inline-block w-14 h-7">
-            <input 
-              type="checkbox" 
-              checked={darkMode}
-              onChange={(e) => setDarkMode(e.target.checked)}
-              className="sr-only peer" 
-            />
-            <div className={`w-14 h-7 rounded-full peer peer-focus:ring-2 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:rounded-full after:h-6 after:w-6 after:transition-all ${
-              darkMode 
-                ? 'bg-blue-600 peer-focus:ring-blue-300 after:bg-white'
-                : 'bg-slate-300 peer-focus:ring-slate-400 after:bg-white'
-            }`}></div>
-          </div>
-          <button 
-            onClick={() => setDarkMode(true)}
-            className={`p-2 rounded-full transition-all ${
-              darkMode ? 'bg-slate-600 shadow-lg text-blue-400' : 'text-slate-400 hover:bg-slate-300'
-            }`}
-          >
-            🌙
-          </button>
-        </div>
-
         {/* Right Side - Notificações e Profile */}
         <div className="flex items-center gap-2 sm:gap-4">
           <NotificationDropdown darkMode={darkMode} />
@@ -225,36 +167,80 @@ export default function ProfessorDashboard() {
       </div>
 
       <div className="max-w-7xl mx-auto p-3 sm:p-5 w-full">
-        {/* Título do Dashboard */}
-        <div className={`rounded-2xl sm:rounded-3xl p-4 sm:p-6 mb-4 sm:mb-6 shadow-2xl transition-colors ${
-          darkMode ? 'bg-slate-800' : 'bg-white'
-        }`}>
-          <h2 className={`text-2xl sm:text-3xl font-bold mb-2 transition-colors ${
-            darkMode ? 'text-white' : 'text-slate-900'
+        {/* Welcome + Nav */}
+        <div className="mb-5 sm:mb-6">
+          <div className={`rounded-2xl sm:rounded-3xl p-5 sm:p-6 mb-4 transition-colors ${
+            darkMode
+              ? 'bg-gradient-to-r from-indigo-900/60 to-slate-800 border border-indigo-700/40'
+              : 'bg-gradient-to-r from-indigo-600 to-indigo-500'
           }`}>
-            Dashboard do Professor
-          </h2>
-          <p className={`transition-colors ${
-            darkMode ? 'text-slate-400' : 'text-slate-600'
-          }`}>{professor.nome}</p>
-          <div className="flex flex-wrap gap-3 mt-4">
+            <p className={`text-sm font-medium mb-1 ${
+              darkMode ? 'text-indigo-300' : 'text-indigo-200'
+            }`}>Bem-vindo de volta,</p>
+            <h2 className="text-2xl sm:text-3xl font-black text-white">
+              {professor.nome.split(' ')[0]}
+            </h2>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
             <button
               onClick={() => navigate('/professor/atividades')}
-              className="px-5 py-2.5 bg-indigo-600 text-white font-semibold rounded-xl hover:bg-indigo-700 transition-colors flex items-center gap-2"
+              className={`flex items-center gap-4 p-4 sm:p-5 rounded-2xl text-left transition-all group ${
+                darkMode
+                  ? 'bg-slate-800 border border-slate-700 hover:border-indigo-500/50'
+                  : 'bg-white border border-slate-200 hover:border-indigo-300 hover:shadow-lg hover:shadow-indigo-100/50'
+              }`}
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+              <div className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                darkMode ? 'bg-indigo-900/50' : 'bg-indigo-100'
+              }`}>
+                <svg className="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                </svg>
+              </div>
+              <div className="min-w-0">
+                <p className={`font-bold text-sm ${
+                  darkMode ? 'text-white' : 'text-slate-900'
+                }`}>Atividades</p>
+                <p className={`text-xs mt-0.5 ${
+                  darkMode ? 'text-slate-500' : 'text-slate-400'
+                }`}>Gerenciar e criar</p>
+              </div>
+              <svg className={`w-4 h-4 ml-auto flex-shrink-0 transition-transform group-hover:translate-x-0.5 ${
+                darkMode ? 'text-slate-600' : 'text-slate-300'
+              }`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
-              Gerenciar Atividades
             </button>
+
             <button
               onClick={() => navigate('/professor/redacoes')}
-              className="px-5 py-2.5 bg-purple-600 text-white font-semibold rounded-xl hover:bg-purple-700 transition-colors flex items-center gap-2"
+              className={`flex items-center gap-4 p-4 sm:p-5 rounded-2xl text-left transition-all group ${
+                darkMode
+                  ? 'bg-slate-800 border border-slate-700 hover:border-purple-500/50'
+                  : 'bg-white border border-slate-200 hover:border-purple-300 hover:shadow-lg hover:shadow-purple-100/50'
+              }`}
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              <div className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                darkMode ? 'bg-purple-900/50' : 'bg-purple-100'
+              }`}>
+                <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+              </div>
+              <div className="min-w-0">
+                <p className={`font-bold text-sm ${
+                  darkMode ? 'text-white' : 'text-slate-900'
+                }`}>Redações</p>
+                <p className={`text-xs mt-0.5 ${
+                  darkMode ? 'text-slate-500' : 'text-slate-400'
+                }`}>Corrigir e revisar</p>
+              </div>
+              <svg className={`w-4 h-4 ml-auto flex-shrink-0 transition-transform group-hover:translate-x-0.5 ${
+                darkMode ? 'text-slate-600' : 'text-slate-300'
+              }`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
-              Corrigir Redações
             </button>
           </div>
         </div>
@@ -262,84 +248,96 @@ export default function ProfessorDashboard() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
           {/* Lista de Alunos */}
           <div className="lg:col-span-1">
-            <div className={`rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-2xl transition-colors ${
-              darkMode ? 'bg-slate-800' : 'bg-white'
+            <div className={`rounded-2xl sm:rounded-3xl p-4 sm:p-5 shadow-sm transition-colors ${
+              darkMode ? 'bg-slate-800 border border-slate-700' : 'bg-white border border-slate-200'
             }`}>
-              <h2 className={`text-lg sm:text-xl font-bold mb-4 transition-colors ${
-                darkMode ? 'text-white' : 'text-slate-900'
-              }`}>Alunos da Escola</h2>
-              
+              <div className="flex items-center justify-between mb-4">
+                <h2 className={`text-base font-bold ${
+                  darkMode ? 'text-white' : 'text-slate-900'
+                }`}>Alunos</h2>
+                {alunos.length > 0 && (
+                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                    darkMode ? 'bg-slate-700 text-slate-300' : 'bg-slate-100 text-slate-600'
+                  }`}>{alunos.length}</span>
+                )}
+              </div>
+
               {/* Campo de busca */}
-              <div className="mb-4">
+              <div className="mb-3">
                 <div className="relative">
                   <input
                     type="text"
                     placeholder="Buscar aluno..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className={`w-full px-4 py-3 pl-10 rounded-xl border-2 transition-all focus:outline-none ${
+                    className={`w-full px-4 py-2.5 pl-9 rounded-xl text-sm border transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/20 ${
                       darkMode
-                        ? 'bg-slate-700 border-slate-600 text-slate-100 placeholder-slate-400 focus:border-indigo-500'
-                        : 'bg-white border-slate-300 text-slate-900 placeholder-slate-500 focus:border-indigo-500'
+                        ? 'bg-slate-700 border-slate-600 text-slate-100 placeholder-slate-500 focus:border-indigo-500'
+                        : 'bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400 focus:border-indigo-400 focus:bg-white'
                     }`}
                   />
                   <svg
-                    className={`absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 transition-colors ${
-                      darkMode ? 'text-slate-400' : 'text-slate-500'
+                    className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${
+                      darkMode ? 'text-slate-500' : 'text-slate-400'
                     }`}
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
+                    fill="none" stroke="currentColor" viewBox="0 0 24 24"
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                    />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                   </svg>
                 </div>
-                {searchTerm && (
-                  <p className={`text-sm mt-2 transition-colors ${
-                    darkMode ? 'text-slate-400' : 'text-slate-600'
-                  }`}>
-                    {alunosFiltrados.length} aluno(s) encontrado(s)
-                  </p>
-                )}
               </div>
-              
+
               {loading && !alunoSelecionado && (
-                <p className={`text-center py-8 transition-colors ${
-                  darkMode ? 'text-slate-400' : 'text-slate-600'
-                }`}>Carregando...</p>
+                <div className="space-y-2 mt-2">
+                  {[1,2,3].map(i => (
+                    <div key={i} className={`h-14 rounded-xl animate-pulse ${
+                      darkMode ? 'bg-slate-700' : 'bg-slate-100'
+                    }`} />
+                  ))}
+                </div>
               )}
 
               {error && !alunos.length && (
-                <p className="text-red-400 text-center py-8">{error}</p>
+                <p className="text-red-400 text-center py-8 text-sm">{error}</p>
               )}
 
-              <div className="space-y-2 max-h-[600px] overflow-y-auto">
-                {alunosFiltrados.map((aluno) => (
-                  <button
-                    type="button"
-                    key={aluno.id}
-                    onClick={(e) => handleSelecionarAluno(aluno, e)}
-                    className={`w-full text-left p-4 rounded-xl transition-all ${
-                      alunoSelecionado?.id === aluno.id
-                        ? 'bg-indigo-600 text-white'
-                        : darkMode
-                        ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                    }`}
-                  >
-                    <p className="font-semibold">{aluno.nome}</p>
-                    <p className="text-sm opacity-75">{aluno.email}</p>
-                  </button>
-                ))}
+              <div className="space-y-1.5 max-h-[520px] overflow-y-auto">
+                {alunosFiltrados.map((aluno) => {
+                  const initials = aluno.nome.split(' ').slice(0, 2).map((p: string) => p[0]).join('').toUpperCase();
+                  const isSelected = alunoSelecionado?.id === aluno.id;
+                  return (
+                    <button
+                      type="button"
+                      key={aluno.id}
+                      onClick={(e) => handleSelecionarAluno(aluno, e)}
+                      className={`w-full text-left px-3 py-3 rounded-xl transition-all flex items-center gap-3 ${
+                        isSelected
+                          ? 'bg-indigo-600 text-white'
+                          : darkMode
+                          ? 'hover:bg-slate-700 text-slate-300'
+                          : 'hover:bg-slate-50 text-slate-700'
+                      }`}
+                    >
+                      <div className={`w-9 h-9 rounded-lg flex-shrink-0 flex items-center justify-center text-xs font-bold ${
+                        isSelected
+                          ? 'bg-white/20 text-white'
+                          : darkMode ? 'bg-slate-700 text-indigo-400' : 'bg-indigo-100 text-indigo-700'
+                      }`}>
+                        {initials}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-semibold text-sm truncate">{aluno.nome}</p>
+                        <p className={`text-xs truncate ${
+                          isSelected ? 'text-indigo-200' : darkMode ? 'text-slate-500' : 'text-slate-400'
+                        }`}>{aluno.email}</p>
+                      </div>
+                    </button>
+                  );
+                })}
 
                 {!loading && alunosFiltrados.length === 0 && (
-                  <p className={`text-center py-8 transition-colors ${
-                    darkMode ? 'text-slate-400' : 'text-slate-600'
+                  <p className={`text-center py-8 text-sm ${
+                    darkMode ? 'text-slate-500' : 'text-slate-400'
                   }`}>
                     {searchTerm ? 'Nenhum aluno encontrado' : 'Nenhum aluno cadastrado'}
                   </p>
@@ -350,196 +348,12 @@ export default function ProfessorDashboard() {
 
           {/* Área de Dados do Aluno */}
           <div className="lg:col-span-2">
-            {!alunoSelecionado ? (
-              <div className={`rounded-2xl sm:rounded-3xl p-8 sm:p-12 shadow-2xl text-center transition-colors ${
-                darkMode ? 'bg-slate-800' : 'bg-white'
-              }`}>
-                <svg className={`w-24 h-24 mx-auto mb-4 transition-colors ${
-                  darkMode ? 'text-slate-600' : 'text-slate-300'
-                }`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                </svg>
-                <h3 className={`text-lg sm:text-xl font-semibold mb-2 transition-colors ${
-                  darkMode ? 'text-slate-400' : 'text-slate-600'
-                }`}>
-                  Selecione um Aluno
-                </h3>
-                <p className={`transition-colors ${
-                  darkMode ? 'text-slate-500' : 'text-slate-500'
-                }`}>
-                  Escolha um aluno da lista para visualizar seu desempenho
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-4 sm:space-y-6">
-                {/* Header do Aluno */}
-                <div className={`rounded-2xl p-4 sm:p-6 transition-colors ${
-                  darkMode ? 'bg-slate-800' : 'bg-white border border-slate-200'
-                }`}>
-                  <h4 className={`text-lg sm:text-xl font-bold mb-1 transition-colors ${
-                    darkMode ? 'text-white' : 'text-slate-900'
-                  }`}>{alunoSelecionado.nome}</h4>
-                  <p className={`text-sm transition-colors ${
-                    darkMode ? 'text-slate-400' : 'text-slate-600'
-                  }`}>{alunoSelecionado.email}</p>
-                </div>
-
-                {/* Cards de Estatísticas */}
-                {loading ? (
-                  <p className={`text-center py-8 transition-colors ${
-                    darkMode ? 'text-slate-400' : 'text-slate-600'
-                  }`}>Carregando estatísticas...</p>
-                ) : estatisticas && (
-                  <>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
-                      <div className={`rounded-2xl p-5 shadow-xl transition-colors ${
-                        darkMode ? 'bg-slate-800' : 'bg-white border border-slate-200'
-                      }`}>
-                        <p className={`text-sm mb-1 transition-colors ${
-                          darkMode ? 'text-slate-400' : 'text-slate-600'
-                        }`}>Atividades</p>
-                        <p className="text-3xl sm:text-4xl font-bold text-indigo-400">{estatisticas.totalAtividades}</p>
-                      </div>
-                      <div className={`rounded-2xl p-4 sm:p-5 shadow-xl transition-colors ${
-                        darkMode ? 'bg-slate-800' : 'bg-white border border-slate-200'
-                      }`}>
-                        <p className={`text-xs sm:text-sm mb-1 transition-colors ${
-                          darkMode ? 'text-slate-400' : 'text-slate-600'
-                        }`}>Média de Notas</p>
-                        <p className="text-3xl sm:text-4xl font-bold text-purple-400">{estatisticas.mediaNotas.toFixed(1)}%</p>
-                      </div>
-                      <div className={`rounded-2xl p-4 sm:p-5 shadow-xl transition-colors ${
-                        darkMode ? 'bg-slate-800' : 'bg-white border border-slate-200'
-                      }`}>
-                        <p className={`text-xs sm:text-sm mb-1 transition-colors ${
-                          darkMode ? 'text-slate-400' : 'text-slate-600'
-                        }`}>Tempo Total</p>
-                        <p className="text-3xl sm:text-4xl font-bold text-blue-400">
-                          {((estatisticas.tempoTotalSegundos || 0) / 3600).toFixed(1)}h
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Gráficos */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-                      <div className={`rounded-2xl p-4 sm:p-5 shadow-2xl transition-colors ${
-                        darkMode ? 'bg-slate-800' : 'bg-white border border-slate-200'
-                      }`}>
-                        <h5 className={`text-sm sm:text-base font-bold mb-3 transition-colors ${
-                          darkMode ? 'text-white' : 'text-slate-900'
-                        }`}>Evolução das Notas</h5>
-                        <Line
-                          data={dadosEvolucao}
-                          options={{
-                            responsive: true,
-                            plugins: { legend: { display: false } },
-                            scales: {
-                              y: {
-                                beginAtZero: true,
-                                max: 100,
-                                ticks: { color: darkMode ? '#94a3b8' : '#64748b' },
-                                grid: { color: darkMode ? '#475569' : '#e2e8f0' },
-                              },
-                              x: {
-                                ticks: { color: darkMode ? '#94a3b8' : '#64748b' },
-                                grid: { color: darkMode ? '#475569' : '#e2e8f0' },
-                              },
-                            },
-                          }}
-                        />
-                      </div>
-
-                      <div className={`rounded-2xl p-4 sm:p-5 shadow-2xl transition-colors ${
-                        darkMode ? 'bg-slate-800' : 'bg-white border border-slate-200'
-                      }`}>
-                        <h5 className={`text-sm sm:text-base font-bold mb-3 transition-colors ${
-                          darkMode ? 'text-white' : 'text-slate-900'
-                        }`}>Acertos vs Erros</h5>
-                        <Doughnut
-                          data={dadosAcertosErros}
-                          options={{
-                            responsive: true,
-                            plugins: {
-                              legend: {
-                                position: 'bottom',
-                                labels: { color: darkMode ? '#94a3b8' : '#64748b' },
-                              },
-                            },
-                          }}
-                        />
-                      </div>
-                    </div>
-
-                    {/* Calendário de Frequência */}
-                    <div className={`rounded-2xl p-4 sm:p-5 shadow-2xl transition-colors ${
-                      darkMode ? 'bg-slate-800' : 'bg-white border border-slate-200'
-                    }`}>
-                      <h5 className={`text-sm sm:text-base font-bold mb-3 transition-colors ${
-                        darkMode ? 'text-white' : 'text-slate-900'
-                      }`}>Calendário de Frequência</h5>
-                      <Calendar darkMode={darkMode} userId={alunoSelecionado.id} />
-                    </div>
-
-                    {/* Tabela de Últimas Atividades */}
-                    {estatisticas.ultimasAtividades && estatisticas.ultimasAtividades.length > 0 && (
-                      <div className={`rounded-2xl p-4 sm:p-5 transition-colors ${
-                        darkMode ? 'bg-slate-800' : 'bg-white border border-slate-200'
-                      }`}>
-                        <h5 className={`text-sm sm:text-base font-bold mb-3 transition-colors ${
-                          darkMode ? 'text-white' : 'text-slate-900'
-                        }`}>Últimas Atividades</h5>
-                        <div className="overflow-x-auto">
-                          <table className="w-full">
-                            <thead>
-                              <tr className={`border-b transition-colors ${
-                                darkMode ? 'border-slate-600' : 'border-slate-300'
-                              }`}>
-                                <th className={`px-4 py-2 text-left text-sm transition-colors ${
-                                  darkMode ? 'text-slate-400' : 'text-slate-600'
-                                }`}>Data</th>
-                                <th className={`px-4 py-2 text-left text-sm transition-colors ${
-                                  darkMode ? 'text-slate-400' : 'text-slate-600'
-                                }`}>Nota</th>
-                                <th className={`px-4 py-2 text-left text-sm transition-colors ${
-                                  darkMode ? 'text-slate-400' : 'text-slate-600'
-                                }`}>Acertos</th>
-                                <th className={`px-4 py-2 text-left text-sm transition-colors ${
-                                  darkMode ? 'text-slate-400' : 'text-slate-600'
-                                }`}>Erros</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {estatisticas.ultimasAtividades.slice(-5).reverse().map((ativ, idx) => (
-                                <tr key={idx} className={`border-b transition-colors ${
-                                  darkMode ? 'border-slate-600' : 'border-slate-300'
-                                }`}>
-                                  <td className={`px-4 py-3 text-sm transition-colors ${
-                                    darkMode ? 'text-slate-300' : 'text-slate-700'
-                                  }`}>
-                                    {new Date(ativ.data).toLocaleDateString('pt-BR')}
-                                  </td>
-                                  <td className={`px-4 py-3 text-sm font-semibold ${
-                                    ativ.nota >= 70 ? 'text-green-500' : 'text-red-500'
-                                  }`}>
-                                    {ativ.nota.toFixed(0)}%
-                                  </td>
-                                  <td className={`px-4 py-3 text-sm ${
-                                    darkMode ? 'text-green-400' : 'text-green-600'
-                                  }`}>{ativ.acertos}</td>
-                                  <td className={`px-4 py-3 text-sm ${
-                                    darkMode ? 'text-red-400' : 'text-red-600'
-                                  }`}>{ativ.erros}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-            )}
+            <EstatisticasAluno
+              darkMode={darkMode}
+              aluno={alunoSelecionado}
+              estatisticas={estatisticas}
+              loading={loading}
+            />
           </div>
         </div>
       </div>

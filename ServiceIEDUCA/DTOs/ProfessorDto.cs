@@ -103,4 +103,28 @@ namespace ServiceIEDUCA.DTOs
         public bool RevisadaPorProfessor { get; set; }
         public DateTime? DataEnvio { get; set; }
     }
+
+    public class GrifoDto
+    {
+        public int Id { get; set; }
+        public int PosicaoInicio { get; set; }
+        public int PosicaoFim { get; set; }
+        public string Cor { get; set; } = "yellow";
+        public string? Comentario { get; set; }
+    }
+
+    public class SalvarGrifosDto
+    {
+        public int RedacaoCorrecaoId { get; set; }
+        public int ProfessorId { get; set; }
+        public List<GrifoItemDto> Grifos { get; set; } = new();
+    }
+
+    public class GrifoItemDto
+    {
+        public int PosicaoInicio { get; set; }
+        public int PosicaoFim { get; set; }
+        public string Cor { get; set; } = "yellow";
+        public string? Comentario { get; set; }
+    }
 }

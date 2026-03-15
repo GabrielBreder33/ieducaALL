@@ -15,5 +15,8 @@ namespace ServiceIEDUCA.Services
         Task<ProfessorRedacaoRevisaoDto> CriarRevisaoRedacaoAsync(CriarRevisaoRedacaoDto dto);
         Task<ProfessorRedacaoRevisaoDto> AtualizarRevisaoRedacaoAsync(int revisaoId, int professorId, AtualizarRevisaoRedacaoDto dto);
         Task<ProfessorRedacaoRevisaoDto?> ObterRevisaoRedacaoAsync(int redacaoCorrecaoId);
+
+        Task<List<GrifoDto>> SalvarGrifosAsync(SalvarGrifosDto dto);
+        Task<List<GrifoDto>> ObterGrifosAsync(int redacaoCorrecaoId);
     }
 }

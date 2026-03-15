@@ -72,6 +72,50 @@ export function ProfessorTab({ correcaoCompleta, darkMode, viewMode, setViewMode
             </div>
           )}
 
+          {/* Grifos do professor */}
+          {rev.grifos && rev.grifos.length > 0 && (
+            <div className={`rounded-3xl border p-6 ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200 shadow-xl'}`}>
+              <div className="flex items-center gap-3 mb-4">
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${darkMode ? 'bg-amber-500/15' : 'bg-amber-50'}`}>
+                  <span className="text-lg">🖍️</span>
+                </div>
+                <div>
+                  <h3 className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>Destaques do Professor</h3>
+                  <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>{rev.grifos.length} trecho{rev.grifos.length > 1 ? 's' : ''} destacado{rev.grifos.length > 1 ? 's' : ''}</p>
+                </div>
+              </div>
+              <div className="space-y-3">
+                {rev.grifos.map((g, idx) => {
+                  const corMap: Record<string, { bg: string; border: string; label: string }> = {
+                    yellow: { bg: 'rgba(253,224,71,0.3)', border: '#eab308', label: 'Atenção' },
+                    red: { bg: 'rgba(252,165,165,0.3)', border: '#ef4444', label: 'Correção' },
+                    green: { bg: 'rgba(134,239,172,0.3)', border: '#22c55e', label: 'Positivo' },
+                    blue: { bg: 'rgba(147,197,253,0.3)', border: '#3b82f6', label: 'Observação' },
+                    orange: { bg: 'rgba(253,186,116,0.3)', border: '#f97316', label: 'Alerta' },
+                  };
+                  const cores = corMap[g.cor] || corMap.yellow;
+                  const textoTrecho = (correcaoCompleta.textoRedacao || '').substring(g.posicaoInicio, g.posicaoFim);
+                  return (
+                    <div key={g.id || idx} className={`rounded-2xl border-l-4 p-4 ${darkMode ? 'bg-slate-800/50' : 'bg-slate-50'}`} style={{ borderLeftColor: cores.border }}>
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="w-3 h-3 rounded-full" style={{ backgroundColor: cores.border }} />
+                        <span className={`text-xs font-bold uppercase tracking-wider`} style={{ color: cores.border }}>{cores.label}</span>
+                      </div>
+                      <p className={`text-sm leading-relaxed rounded-lg px-3 py-2 mb-2 ${darkMode ? 'text-slate-200' : 'text-slate-800'}`} style={{ backgroundColor: cores.bg }}>
+                        "{textoTrecho}"
+                      </p>
+                      {g.comentario && (
+                        <p className={`text-sm italic ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                          💬 {g.comentario}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Competency details */}
           <div className={`rounded-3xl border ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200 shadow-xl'} p-6`}>
             <div className="mb-6">

@@ -23,6 +23,14 @@ export interface ProfessorCompetenciaRevisaoView {
   comentarioProfessor?: string;
 }
 
+export interface GrifoView {
+  id: number;
+  posicaoInicio: number;
+  posicaoFim: number;
+  cor: string;
+  comentario?: string;
+}
+
 export interface RevisaoProfessorView {
   id: number;
   professorNome: string;
@@ -31,6 +39,7 @@ export interface RevisaoProfessorView {
   criadoEm: string;
   atualizadoEm?: string;
   competencias: ProfessorCompetenciaRevisaoView[];
+  grifos?: GrifoView[];
 }
 
 export type ExtendedEssayCorrection = EssayCorrection & {

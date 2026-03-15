@@ -469,6 +469,7 @@ namespace ServiceIEDUCA.Controllers
                 var revisaoProfessor = await _context.ProfessorRedacaoRevisoes
                     .Include(r => r.CompetenciaRevisoes)
                     .Include(r => r.Professor)
+                    .Include(r => r.Grifos)
                     .FirstOrDefaultAsync(r => r.RedacaoCorrecaoId == id);
 
                 var feedbacksAgrupados = new
@@ -542,6 +543,16 @@ namespace ServiceIEDUCA.Controllers
                                 numeroCompetencia = c.NumeroCompetencia,
                                 notaProfessor = c.NotaProfessor,
                                 comentarioProfessor = c.ComentarioProfessor
+                            }).ToArray(),
+                        grifos = (revisaoProfessor.Grifos ?? new List<ProfessorRedacaoGrifo>())
+                            .OrderBy(g => g.PosicaoInicio)
+                            .Select(g => new
+                            {
+                                id = g.Id,
+                                posicaoInicio = g.PosicaoInicio,
+                                posicaoFim = g.PosicaoFim,
+                                cor = g.Cor,
+                                comentario = g.Comentario
                             }).ToArray()
                     }
                 };

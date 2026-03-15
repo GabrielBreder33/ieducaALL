@@ -225,5 +225,49 @@ namespace ServiceIEDUCA.Controllers
                 return StatusCode(500, new { message = "Erro ao obter revisão" });
             }
         }
+
+        [HttpPut("redacoes/grifos")]
+        public async Task<ActionResult<List<GrifoDto>>> SalvarGrifos([FromBody] SalvarGrifosDto dto)
+        {
+            try
+            {
+                if (dto.RedacaoCorrecaoId <= 0)
+                    return BadRequest(new { message = "RedacaoCorrecaoId inválido" });
+
+                if (dto.ProfessorId <= 0)
+                    return BadRequest(new { message = "ProfessorId inválido" });
+
+                var resultado = await _professorService.SalvarGrifosAsync(dto);
+                return Ok(resultado);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Unauthorized(new { message = ex.Message });
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Erro ao salvar grifos");
+                return StatusCode(500, new { message = "Erro ao salvar grifos" });
+            }
+        }
+
+        [HttpGet("redacoes/grifos/{redacaoCorrecaoId}")]
+        public async Task<ActionResult<List<GrifoDto>>> ObterGrifos(int redacaoCorrecaoId)
+        {
+            try
+            {
+                var resultado = await _professorService.ObterGrifosAsync(redacaoCorrecaoId);
+                return Ok(resultado);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Erro ao obter grifos da redação {RedacaoId}", redacaoCorrecaoId);
+                return StatusCode(500, new { message = "Erro ao obter grifos" });
+            }
+        }
     }
 }

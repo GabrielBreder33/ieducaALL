@@ -13,6 +13,7 @@ import EscolaDashboard from './pages/Escola/Dashboard';
 import ProfessorDashboard from './pages/Professor/Dashboard';
 import GerenciarAtividades from './pages/Professor/GerenciarAtividades';
 import CorrigirRedacoes from './pages/Professor/CorrigirRedacoes';
+import CorrigirRedacao from './pages/Professor/CorrigirRedacao';
 import PrivateRoute from './components/PrivateRoute';
 
 function App() {
@@ -25,6 +26,7 @@ function App() {
         <Route path="/professor/dashboard" element={<ProfessorDashboard />} />
         <Route path="/professor/atividades" element={<GerenciarAtividades />} />
         <Route path="/professor/redacoes" element={<CorrigirRedacoes />} />
+        <Route path="/professor/redacoes/:id" element={<CorrigirRedacao />} />
         <Route path="/aluno/estudos" element={<Estudos />} />
         <Route path="/aluno/atividades" element={<Atividade />} />
         <Route path="/aluno/atividade/gerar-ia" element={<AtividadeIAPage />} />

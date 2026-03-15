@@ -32,5 +32,7 @@ namespace ServiceIEDUCA.Models
         public virtual User? Professor { get; set; }
 
         public virtual ICollection<ProfessorCompetenciaRevisao>? CompetenciaRevisoes { get; set; }
+
+        public virtual ICollection<ProfessorRedacaoGrifo>? Grifos { get; set; }
     }
 }

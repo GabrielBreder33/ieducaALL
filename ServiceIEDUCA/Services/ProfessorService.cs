@@ -341,6 +341,61 @@ namespace ServiceIEDUCA.Services
             return await MapRevisaoDto(revisao);
         }
 
+        public async Task<List<GrifoDto>> SalvarGrifosAsync(SalvarGrifosDto dto)
+        {
+            var professor = await _context.Users.FindAsync(dto.ProfessorId);
+            if (professor == null || professor.Role != "Professor")
+                throw new UnauthorizedAccessException("Usuário não é um professor válido");
+
+            var revisao = await _context.ProfessorRedacaoRevisoes
+                .Include(r => r.Grifos)
+                .FirstOrDefaultAsync(r => r.RedacaoCorrecaoId == dto.RedacaoCorrecaoId && r.ProfessorId == dto.ProfessorId);
+
+            if (revisao == null)
+                throw new KeyNotFoundException("Revisão não encontrada. Crie uma revisão antes de adicionar grifos.");
+
+            if (revisao.Grifos != null && revisao.Grifos.Count > 0)
+            {
+                _context.ProfessorRedacaoGrifos.RemoveRange(revisao.Grifos);
+            }
+
+            foreach (var item in dto.Grifos)
+            {
+                _context.ProfessorRedacaoGrifos.Add(new ProfessorRedacaoGrifo
+                {
+                    RevisaoId = revisao.Id,
+                    PosicaoInicio = item.PosicaoInicio,
+                    PosicaoFim = item.PosicaoFim,
+                    Cor = item.Cor,
+                    Comentario = item.Comentario,
+                    CriadoEm = DateTime.UtcNow
+                });
+            }
+
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("Professor {ProfessorId} salvou {Count} grifos para revisão {RevisaoId}",
+                dto.ProfessorId, dto.Grifos.Count, revisao.Id);
+
+            return await ObterGrifosAsync(dto.RedacaoCorrecaoId);
+        }
+
+        public async Task<List<GrifoDto>> ObterGrifosAsync(int redacaoCorrecaoId)
+        {
+            return await _context.ProfessorRedacaoGrifos
+                .Where(g => g.Revisao!.RedacaoCorrecaoId == redacaoCorrecaoId)
+                .OrderBy(g => g.PosicaoInicio)
+                .Select(g => new GrifoDto
+                {
+                    Id = g.Id,
+                    PosicaoInicio = g.PosicaoInicio,
+                    PosicaoFim = g.PosicaoFim,
+                    Cor = g.Cor,
+                    Comentario = g.Comentario
+                })
+                .ToListAsync();
+        }
+
         private async Task<AtribuicaoAtividadeDto> MapAtribuicaoDto(int atribuicaoId)
         {
             return await _context.AtividadeAtribuicoes
