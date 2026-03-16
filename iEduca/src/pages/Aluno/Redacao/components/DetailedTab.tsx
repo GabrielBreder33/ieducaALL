@@ -72,18 +72,6 @@ export function DetailedTab({ correcaoCompleta, darkMode, viewMode, setViewMode 
 
           {/* Essay text with errors */}
           <div className={`rounded-3xl border p-8 space-y-8 ${darkMode ? 'bg-slate-900/70 border-slate-700' : 'bg-white border-slate-200 shadow-xl'}`}>
-            <div className="flex items-center justify-between">
-              <p className={`text-sm font-semibold tracking-[0.3em] uppercase ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Redação</p>
-              <div className="flex items-center gap-3 text-xs text-black">
-                <span className="flex items-center gap-1"><span className="w-3 h-3 bg-red-300 border border-red-500 rounded" />Erro/Desvio</span>
-                <span className="flex items-center gap-1"><span className="w-3 h-3 bg-yellow-200 border border-yellow-500 rounded" />Atenção</span>
-                <span className="flex items-center gap-1"><span className="w-3 h-3 bg-blue-200 border border-blue-500 rounded" />Sugestão</span>
-                {correcaoCompleta.revisaoProfessor?.grifos && correcaoCompleta.revisaoProfessor.grifos.length > 0 && (
-                  <span className="flex items-center gap-1"><span className="w-3 h-3 rounded" style={{ backgroundColor: 'rgba(168,85,247,0.4)', border: '1px solid #a855f7' }} />Professor</span>
-                )}
-              </div>
-            </div>
-
             <div className={`text-lg leading-relaxed font-serif ${darkMode ? 'text-slate-100' : 'text-slate-900'} space-y-5`}>
               <TextoComErros
                 texto={correcaoCompleta.textoRedacao ?? ''}

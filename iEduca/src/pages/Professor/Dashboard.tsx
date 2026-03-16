@@ -72,7 +72,6 @@ export default function ProfessorDashboard() {
   }, [navigate]);
 
   useEffect(() => {
-    // Filtrar alunos quando o termo de busca mudar
     if (searchTerm.trim() === '') {
       setAlunosFiltrados(alunos);
     } else {
@@ -141,20 +140,17 @@ export default function ProfessorDashboard() {
     <div className={`min-h-screen overflow-x-hidden w-full max-w-full transition-colors ${
       darkMode ? 'bg-slate-900' : 'bg-slate-50'
     }`}>
-      {/* Header igual ao do aluno */}
       <div className={`sticky top-0 z-40 flex justify-between items-center px-3 sm:px-6 py-3 sm:py-4 backdrop-blur-lg border-b transition-colors ${
         darkMode 
           ? 'bg-slate-800/80 border-slate-700 shadow-lg'
           : 'bg-white/90 border-slate-300 shadow-sm'
       }`}>
-        {/* Logo */}
         <div className="flex items-center">
           <h1 className={`text-xl sm:text-2xl font-bold tracking-wide transition-colors ${
             darkMode ? 'text-white' : 'text-slate-900'
           }`}>IEDUCA</h1>
         </div>
 
-        {/* Right Side - Notificações e Profile */}
         <div className="flex items-center gap-2 sm:gap-4">
           <NotificationDropdown darkMode={darkMode} />
           <ProfileMenu 
@@ -167,7 +163,6 @@ export default function ProfessorDashboard() {
       </div>
 
       <div className="max-w-7xl mx-auto p-3 sm:p-5 w-full">
-        {/* Welcome + Nav */}
         <div className="mb-5 sm:mb-6">
           <div className={`rounded-2xl sm:rounded-3xl p-5 sm:p-6 mb-4 transition-colors ${
             darkMode
@@ -246,7 +241,6 @@ export default function ProfessorDashboard() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
-          {/* Lista de Alunos */}
           <div className="lg:col-span-1">
             <div className={`rounded-2xl sm:rounded-3xl p-4 sm:p-5 shadow-sm transition-colors ${
               darkMode ? 'bg-slate-800 border border-slate-700' : 'bg-white border border-slate-200'
@@ -262,7 +256,6 @@ export default function ProfessorDashboard() {
                 )}
               </div>
 
-              {/* Campo de busca */}
               <div className="mb-3">
                 <div className="relative">
                   <input
@@ -346,7 +339,6 @@ export default function ProfessorDashboard() {
             </div>
           </div>
 
-          {/* Área de Dados do Aluno */}
           <div className="lg:col-span-2">
             <EstatisticasAluno
               darkMode={darkMode}

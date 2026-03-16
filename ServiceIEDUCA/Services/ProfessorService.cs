@@ -1,7 +1,9 @@
 using Microsoft.EntityFrameworkCore;
+using ServiceIEDUCA.Controllers;
 using ServiceIEDUCA.Data;
 using ServiceIEDUCA.DTOs;
 using ServiceIEDUCA.Models;
+using System.Text.Json;
 
 namespace ServiceIEDUCA.Services
 {
@@ -9,11 +11,13 @@ namespace ServiceIEDUCA.Services
     {
         private readonly AppDbContext _context;
         private readonly ILogger<ProfessorService> _logger;
+        private readonly IDeepSeekService _deepSeekService;
 
-        public ProfessorService(AppDbContext context, ILogger<ProfessorService> logger)
+        public ProfessorService(AppDbContext context, ILogger<ProfessorService> logger, IDeepSeekService deepSeekService)
         {
             _context = context;
             _logger = logger;
+            _deepSeekService = deepSeekService;
         }
 
         public async Task<AtribuicaoAtividadeDto> CriarAtividadeEAtribuirAsync(CriarAtividadeProfessorDto dto)
@@ -244,9 +248,16 @@ namespace ServiceIEDUCA.Services
                 throw new ArgumentException("Redação não encontrada");
 
             var revisaoExistente = await _context.ProfessorRedacaoRevisoes
-                .AnyAsync(r => r.RedacaoCorrecaoId == dto.RedacaoCorrecaoId);
-            if (revisaoExistente)
-                throw new InvalidOperationException("Esta redação já possui uma revisão do professor. Use o endpoint de atualização.");
+                .FirstOrDefaultAsync(r => r.RedacaoCorrecaoId == dto.RedacaoCorrecaoId);
+            if (revisaoExistente != null)
+            {
+                return await AtualizarRevisaoRedacaoAsync(revisaoExistente.Id, dto.ProfessorId, new AtualizarRevisaoRedacaoDto
+                {
+                    NotaTotalProfessor = dto.NotaTotalProfessor,
+                    ComentarioGeral = dto.ComentarioGeral,
+                    Competencias = dto.Competencias
+                });
+            }
 
             var revisao = new ProfessorRedacaoRevisao
             {
@@ -274,6 +285,25 @@ namespace ServiceIEDUCA.Services
                     });
                 }
                 await _context.SaveChangesAsync();
+            }
+
+            // Notificar aluno sobre a correção
+            try
+            {
+                _context.Notificacoes.Add(new Notificacao
+                {
+                    UserId = redacao.UserId,
+                    Mensagem = $"📝 Prof. {professor.Nome} corrigiu sua redação: {redacao.Tema}",
+                    Tipo = "redacao",
+                    ReferenciaId = redacao.Id,
+                    ReferenciaTipo = "RedacaoCorrecao",
+                    CriadoEm = DateTime.UtcNow
+                });
+                await _context.SaveChangesAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Falha ao criar notificação para redação {RedacaoId} (migração pendente?)", redacao.Id);
             }
 
             _logger.LogInformation("Professor {ProfessorId} criou revisão para redação {RedacaoId}",
@@ -321,6 +351,30 @@ namespace ServiceIEDUCA.Services
             }
 
             await _context.SaveChangesAsync();
+
+            // Notificar aluno sobre a atualização da correção
+            try
+            {
+                var redacaoAtualizada = await _context.RedacaoCorrecoes.FindAsync(revisao.RedacaoCorrecaoId);
+                var professorUser = await _context.Users.FindAsync(professorId);
+                if (redacaoAtualizada != null && professorUser != null)
+                {
+                    _context.Notificacoes.Add(new Notificacao
+                    {
+                        UserId = redacaoAtualizada.UserId,
+                        Mensagem = $"📝 Prof. {professorUser.Nome} atualizou a correção da sua redação: {redacaoAtualizada.Tema}",
+                        Tipo = "redacao",
+                        ReferenciaId = redacaoAtualizada.Id,
+                        ReferenciaTipo = "RedacaoCorrecao",
+                        CriadoEm = DateTime.UtcNow
+                    });
+                    await _context.SaveChangesAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Falha ao criar notificação de atualização para revisão {RevisaoId} (migração pendente?)", revisaoId);
+            }
 
             _logger.LogInformation("Professor {ProfessorId} atualizou revisão {RevisaoId}",
                 professorId, revisaoId);
@@ -396,6 +450,383 @@ namespace ServiceIEDUCA.Services
                 .ToListAsync();
         }
 
+        // ========== Atividade com IA (Professor) ==========
+
+        public async Task<AtividadeComQuestoesDto> GerarAtividadeComIAAsync(GerarAtividadeProfessorDto dto)
+        {
+            var professor = await _context.Users.FindAsync(dto.ProfessorId);
+            if (professor == null || professor.Role != "Professor")
+                throw new UnauthorizedAccessException("Usuário não é um professor válido");
+
+            var materia = await _context.materias.FindAsync(dto.MateriaId);
+            if (materia == null)
+                throw new ArgumentException("Matéria não encontrada");
+
+            // Gerar questões com IA
+            var prompt = $@"Gere {dto.TotalQuestoes} questões de múltipla escolha sobre {dto.Conteudo ?? dto.Nome} para {materia.Nome}.
+
+CONFIGURAÇÃO:
+- Nível de dificuldade: {dto.NivelDificuldade}
+- Quantidade: {dto.TotalQuestoes} questões
+- Descrição da atividade: {dto.Descricao ?? ""}
+
+REGRAS OBRIGATÓRIAS:
+1. Cada questão deve ter exatamente 4 alternativas (A, B, C, D)
+2. Apenas UMA alternativa correta por questão
+3. As alternativas incorretas devem ser plausíveis
+4. Enunciados claros e objetivos
+5. Contextualize com situações do cotidiano
+6. Mantenha enunciados curtos (máx. 200 caracteres)
+7. Mantenha alternativas curtas (máx. 100 caracteres)
+
+FORMATO DE SAÍDA (JSON VÁLIDO):
+{{
+  ""questoes"": [
+    {{
+      ""numero"": 1,
+      ""enunciado"": ""[TEXTO DA QUESTÃO]"",
+      ""alternativas"": [
+        {{""id"": ""A"", ""texto"": ""[ALTERNATIVA A]""}},
+        {{""id"": ""B"", ""texto"": ""[ALTERNATIVA B]""}},
+        {{""id"": ""C"", ""texto"": ""[ALTERNATIVA C]""}},
+        {{""id"": ""D"", ""texto"": ""[ALTERNATIVA D]""}}
+      ]
+    }}
+  ],
+  ""gabarito"": [
+    {{""questao"": 1, ""respostaCorreta"": ""A""}}
+  ]
+}}
+
+IMPORTANTE: Retorne APENAS o JSON, sem texto adicional.";
+
+            var maxTokens = Math.Clamp(dto.TotalQuestoes * 120 + 300, 800, 3000);
+
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(180));
+            var respostaIA = await _deepSeekService.GerarAtividadeAsync(prompt, maxTokens, cts.Token);
+
+            // Limpar resposta
+            respostaIA = respostaIA.Trim();
+            if (respostaIA.StartsWith("```json")) respostaIA = respostaIA[7..];
+            else if (respostaIA.StartsWith("```")) respostaIA = respostaIA[3..];
+            if (respostaIA.EndsWith("```")) respostaIA = respostaIA[..^3];
+            respostaIA = respostaIA.Trim();
+
+            int startIdx = respostaIA.IndexOf('{');
+            int endIdx = respostaIA.LastIndexOf('}');
+            if (startIdx >= 0 && endIdx > startIdx)
+                respostaIA = respostaIA[startIdx..(endIdx + 1)];
+
+            var options = new JsonSerializerOptions
+            {
+                AllowTrailingCommas = true,
+                ReadCommentHandling = JsonCommentHandling.Skip,
+                PropertyNameCaseInsensitive = true
+            };
+
+            var atividadeGerada = JsonSerializer.Deserialize<JsonElement>(respostaIA, options);
+
+            // Processar questões e gabarito
+            var questoes = new List<QuestaoEditadaDto>();
+            var gabarito = new List<GabaritoItemDto>();
+
+            var gabaritoOriginal = new Dictionary<int, string>();
+            foreach (var g in atividadeGerada.GetProperty("gabarito").EnumerateArray())
+            {
+                var questaoNumero = g.TryGetProperty("questao", out var qp) && qp.ValueKind == JsonValueKind.Number ? qp.GetInt32() : 0;
+                var resposta = g.TryGetProperty("respostaCorreta", out var rp) ? rp.GetString() : null;
+                if (questaoNumero > 0 && !string.IsNullOrWhiteSpace(resposta))
+                    gabaritoOriginal[questaoNumero] = resposta.Trim().ToUpperInvariant();
+            }
+
+            var questoesJson = atividadeGerada.GetProperty("questoes").EnumerateArray().ToList();
+            for (int i = 0; i < questoesJson.Count; i++)
+            {
+                var q = questoesJson[i];
+                var numero = i + 1;
+                var alternativas = q.GetProperty("alternativas").EnumerateArray()
+                    .Select((a, idx) => new AlternativaDto
+                    {
+                        Id = a.TryGetProperty("id", out var idProp) ? (idProp.GetString() ?? ((char)('A' + idx)).ToString()) : ((char)('A' + idx)).ToString(),
+                        Texto = a.TryGetProperty("texto", out var tp) ? (tp.GetString() ?? "") : ""
+                    }).ToList();
+
+                questoes.Add(new QuestaoEditadaDto
+                {
+                    Numero = numero,
+                    Enunciado = q.GetProperty("enunciado").GetString() ?? "",
+                    Alternativas = alternativas,
+                    RespostaCorreta = gabaritoOriginal.TryGetValue(numero, out var rc) ? rc : "A"
+                });
+
+                gabarito.Add(new GabaritoItemDto { Questao = numero, RespostaCorreta = gabaritoOriginal.TryGetValue(numero, out var gc) ? gc : "A" });
+            }
+
+            // Salvar atividade (rascunho, sem atribuição ainda)
+            var atividade = new Atividades
+            {
+                Nome = dto.Nome,
+                Descricao = dto.Descricao,
+                MateriaId = dto.MateriaId,
+                Tipo = dto.Tipo,
+                NivelDificuldade = dto.NivelDificuldade,
+                TotalQuestoes = questoes.Count,
+                Ativo = false, // Rascunho até confirmar
+                QuestoesJson = JsonSerializer.Serialize(questoes),
+                GabaritoJson = JsonSerializer.Serialize(gabarito),
+                CriadoEm = DateTime.UtcNow
+            };
+
+            _context.Atividades.Add(atividade);
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("Professor {ProfessorId} gerou atividade {AtividadeId} com {Count} questões via IA",
+                dto.ProfessorId, atividade.Id, questoes.Count);
+
+            return new AtividadeComQuestoesDto
+            {
+                Id = atividade.Id,
+                Nome = atividade.Nome,
+                Descricao = atividade.Descricao,
+                Tipo = atividade.Tipo,
+                NivelDificuldade = atividade.NivelDificuldade,
+                TotalQuestoes = questoes.Count,
+                MateriaNome = materia.Nome,
+                MateriaId = atividade.MateriaId,
+                Questoes = questoes,
+                Gabarito = gabarito,
+                CriadoEm = atividade.CriadoEm
+            };
+        }
+
+        public async Task<List<AtividadeComQuestoesDto>> ListarRascunhosProfessorAsync(int professorId)
+        {
+            // Rascunhos: atividades com Ativo=false que não possuem atribuição ainda
+            var atividadesComAtribuicao = await _context.AtividadeAtribuicoes
+                .Where(a => a.ProfessorId == professorId)
+                .Select(a => a.AtividadeId)
+                .ToListAsync();
+
+            var rascunhos = await _context.Atividades
+                .Include(a => a.Materia)
+                .Where(a => !a.Ativo && !atividadesComAtribuicao.Contains(a.Id) && a.QuestoesJson != null)
+                .OrderByDescending(a => a.CriadoEm)
+                .ToListAsync();
+
+            return rascunhos.Select(a =>
+            {
+                var questoes = !string.IsNullOrEmpty(a.QuestoesJson)
+                    ? JsonSerializer.Deserialize<List<QuestaoEditadaDto>>(a.QuestoesJson, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new()
+                    : new List<QuestaoEditadaDto>();
+                var gabarito = !string.IsNullOrEmpty(a.GabaritoJson)
+                    ? JsonSerializer.Deserialize<List<GabaritoItemDto>>(a.GabaritoJson, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new()
+                    : new List<GabaritoItemDto>();
+                return new AtividadeComQuestoesDto
+                {
+                    Id = a.Id,
+                    Nome = a.Nome,
+                    Descricao = a.Descricao,
+                    Tipo = a.Tipo,
+                    NivelDificuldade = a.NivelDificuldade,
+                    TotalQuestoes = a.TotalQuestoes,
+                    MateriaNome = a.Materia?.Nome ?? "",
+                    MateriaId = a.MateriaId,
+                    Questoes = questoes,
+                    Gabarito = gabarito,
+                    CriadoEm = a.CriadoEm
+                };
+            }).ToList();
+        }
+
+        public async Task<AtividadeComQuestoesDto> ObterAtividadeComQuestoesAsync(int atividadeId)
+        {
+            var atividade = await _context.Atividades
+                .Include(a => a.Materia)
+                .FirstOrDefaultAsync(a => a.Id == atividadeId);
+
+            if (atividade == null)
+                throw new KeyNotFoundException("Atividade não encontrada");
+
+            var questoes = !string.IsNullOrEmpty(atividade.QuestoesJson)
+                ? JsonSerializer.Deserialize<List<QuestaoEditadaDto>>(atividade.QuestoesJson, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new()
+                : new List<QuestaoEditadaDto>();
+
+            var gabarito = !string.IsNullOrEmpty(atividade.GabaritoJson)
+                ? JsonSerializer.Deserialize<List<GabaritoItemDto>>(atividade.GabaritoJson, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new()
+                : new List<GabaritoItemDto>();
+
+            return new AtividadeComQuestoesDto
+            {
+                Id = atividade.Id,
+                Nome = atividade.Nome,
+                Descricao = atividade.Descricao,
+                Tipo = atividade.Tipo,
+                NivelDificuldade = atividade.NivelDificuldade,
+                TotalQuestoes = atividade.TotalQuestoes,
+                MateriaNome = atividade.Materia?.Nome ?? "",
+                MateriaId = atividade.MateriaId,
+                Questoes = questoes,
+                Gabarito = gabarito,
+                CriadoEm = atividade.CriadoEm
+            };
+        }
+
+        public async Task<AtividadeComQuestoesDto> AtualizarQuestoesAsync(int atividadeId, int professorId, List<QuestaoEditadaDto> questoes)
+        {
+            var professor = await _context.Users.FindAsync(professorId);
+            if (professor == null || professor.Role != "Professor")
+                throw new UnauthorizedAccessException("Usuário não é um professor válido");
+
+            var atividade = await _context.Atividades.FindAsync(atividadeId);
+            if (atividade == null)
+                throw new KeyNotFoundException("Atividade não encontrada");
+
+            var gabarito = questoes.Select(q => new GabaritoItemDto
+            {
+                Questao = q.Numero,
+                RespostaCorreta = q.RespostaCorreta
+            }).ToList();
+
+            atividade.QuestoesJson = JsonSerializer.Serialize(questoes);
+            atividade.GabaritoJson = JsonSerializer.Serialize(gabarito);
+            atividade.TotalQuestoes = questoes.Count;
+            atividade.AtualizadoEm = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+
+            return await ObterAtividadeComQuestoesAsync(atividadeId);
+        }
+
+        public async Task<AtribuicaoAtividadeDto> ConfirmarEEnviarAtividadeAsync(ConfirmarAtividadeProfessorDto dto)
+        {
+            var professor = await _context.Users.FindAsync(dto.ProfessorId);
+            if (professor == null || professor.Role != "Professor")
+                throw new UnauthorizedAccessException("Usuário não é um professor válido");
+
+            var atividade = await _context.Atividades.FindAsync(dto.AtividadeId);
+            if (atividade == null)
+                throw new KeyNotFoundException("Atividade não encontrada");
+
+            // Se o professor editou questões, atualizar
+            if (dto.QuestoesEditadas != null && dto.QuestoesEditadas.Count > 0)
+            {
+                var gabarito = dto.QuestoesEditadas.Select(q => new GabaritoItemDto
+                {
+                    Questao = q.Numero,
+                    RespostaCorreta = q.RespostaCorreta
+                }).ToList();
+
+                atividade.QuestoesJson = JsonSerializer.Serialize(dto.QuestoesEditadas);
+                atividade.GabaritoJson = JsonSerializer.Serialize(gabarito);
+                atividade.TotalQuestoes = dto.QuestoesEditadas.Count;
+            }
+
+            atividade.Ativo = true;
+            atividade.AtualizadoEm = DateTime.UtcNow;
+
+            // Criar atribuição
+            var atribuicao = new AtividadeAtribuicao
+            {
+                AtividadeId = atividade.Id,
+                ProfessorId = dto.ProfessorId,
+                AlunoId = dto.AlunoId,
+                EscolaId = professor.id_Escola,
+                Prazo = dto.Prazo.HasValue ? DateTime.SpecifyKind(dto.Prazo.Value, DateTimeKind.Utc) : null,
+                Instrucoes = dto.Instrucoes,
+                Status = "Ativa",
+                CriadoEm = DateTime.UtcNow
+            };
+
+            _context.AtividadeAtribuicoes.Add(atribuicao);
+
+            // Criar notificação para alunos
+            if (dto.AlunoId.HasValue)
+            {
+                // Notificação para aluno específico
+                _context.Notificacoes.Add(new Notificacao
+                {
+                    UserId = dto.AlunoId.Value,
+                    Mensagem = $"📚 Prof. {professor.Nome} passou uma nova atividade: {atividade.Nome}",
+                    Tipo = "atividade",
+                    ReferenciaId = atividade.Id,
+                    ReferenciaTipo = "AtividadeAtribuicao",
+                    CriadoEm = DateTime.UtcNow
+                });
+            }
+            else
+            {
+                // Notificação para todos os alunos da escola
+                var alunoIds = await _context.Users
+                    .Where(u => u.id_Escola == professor.id_Escola && u.Role == "Aluno" && u.Ativo)
+                    .Select(u => u.Id)
+                    .ToListAsync();
+
+                foreach (var alunoId in alunoIds)
+                {
+                    _context.Notificacoes.Add(new Notificacao
+                    {
+                        UserId = alunoId,
+                        Mensagem = $"📚 Prof. {professor.Nome} passou uma nova atividade: {atividade.Nome}",
+                        Tipo = "atividade",
+                        ReferenciaId = atividade.Id,
+                        ReferenciaTipo = "AtividadeAtribuicao",
+                        CriadoEm = DateTime.UtcNow
+                    });
+                }
+            }
+
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("Professor {ProfessorId} confirmou e enviou atividade {AtividadeId}",
+                dto.ProfessorId, atividade.Id);
+
+            return await MapAtribuicaoDto(atribuicao.Id);
+        }
+
+        // ========== Notificações ==========
+
+        public async Task<List<NotificacaoDto>> ListarNotificacoesAsync(int userId)
+        {
+            return await _context.Notificacoes
+                .Where(n => n.UserId == userId)
+                .OrderByDescending(n => n.CriadoEm)
+                .Take(50)
+                .Select(n => new NotificacaoDto
+                {
+                    Id = n.Id,
+                    Mensagem = n.Mensagem,
+                    Tipo = n.Tipo,
+                    ReferenciaId = n.ReferenciaId,
+                    ReferenciaTipo = n.ReferenciaTipo,
+                    Lida = n.Lida,
+                    CriadoEm = n.CriadoEm
+                })
+                .ToListAsync();
+        }
+
+        public async Task MarcarNotificacaoLidaAsync(int notificacaoId, int userId)
+        {
+            var notificacao = await _context.Notificacoes
+                .FirstOrDefaultAsync(n => n.Id == notificacaoId && n.UserId == userId);
+            if (notificacao != null)
+            {
+                notificacao.Lida = true;
+                await _context.SaveChangesAsync();
+            }
+        }
+
+        public async Task MarcarTodasLidasAsync(int userId)
+        {
+            var naoLidas = await _context.Notificacoes
+                .Where(n => n.UserId == userId && !n.Lida)
+                .ToListAsync();
+
+            foreach (var n in naoLidas)
+                n.Lida = true;
+
+            await _context.SaveChangesAsync();
+        }
+
         private async Task<AtribuicaoAtividadeDto> MapAtribuicaoDto(int atribuicaoId)
         {
             return await _context.AtividadeAtribuicoes
@@ -455,6 +886,156 @@ namespace ServiceIEDUCA.Services
                         ComentarioProfessor = c.ComentarioProfessor
                     })
                     .ToList()
+            };
+        }
+
+        // ========== Visualização de Execuções (Professor) ==========
+
+        public async Task<List<ExecucaoAlunoResumoDto>> ListarExecucoesPorAtividadeAsync(int atividadeId, int professorId)
+        {
+            var professor = await _context.Users.FindAsync(professorId);
+            if (professor == null || professor.Role != "Professor")
+                throw new UnauthorizedAccessException("Usuário não é um professor válido");
+
+            var atividade = await _context.Atividades.FindAsync(atividadeId);
+            if (atividade == null)
+                throw new KeyNotFoundException("Atividade não encontrada");
+
+            // Log para diagnóstico
+            var todasExecucoes = await _context.AtividadeExecucoes
+                .Where(e => e.AtividadeId == atividadeId)
+                .Select(e => new { e.Id, e.Status, e.UserId })
+                .ToListAsync();
+            
+            System.Diagnostics.Debug.WriteLine($"[ListarExecucoes] AtividadeId={atividadeId}: {todasExecucoes.Count} execuções totais. Status: {string.Join(", ", todasExecucoes.Select(e => $"#{e.Id}='{e.Status}'"))}");
+            Console.WriteLine($"[ListarExecucoes] AtividadeId={atividadeId}: {todasExecucoes.Count} execuções totais. Status: {string.Join(", ", todasExecucoes.Select(e => $"#{e.Id}='{e.Status}'"))}");
+
+            return await _context.AtividadeExecucoes
+                .Where(e => e.AtividadeId == atividadeId && (e.Status == "Concluída" || e.Status == "Concluida"))
+                .OrderByDescending(e => e.DataFim)
+                .Select(e => new ExecucaoAlunoResumoDto
+                {
+                    ExecucaoId = e.Id,
+                    AlunoId = e.UserId,
+                    AlunoNome = _context.Users.Where(u => u.Id == e.UserId).Select(u => u.Nome).FirstOrDefault() ?? "",
+                    AtividadeId = e.AtividadeId,
+                    AtividadeNome = atividade.Nome,
+                    TotalQuestoes = e.TotalQuestoes,
+                    Acertos = e.Acertos,
+                    Erros = e.Erros,
+                    Nota = e.Nota,
+                    Status = e.Status,
+                    DataFim = e.DataFim
+                })
+                .ToListAsync();
+        }
+
+        public async Task<ExecucaoDetalhadaDto> ObterExecucaoDetalhadaAsync(int execucaoId, int professorId)
+        {
+            var professor = await _context.Users.FindAsync(professorId);
+            if (professor == null || professor.Role != "Professor")
+                throw new UnauthorizedAccessException("Usuário não é um professor válido");
+
+            var execucao = await _context.AtividadeExecucoes
+                .Include(e => e.QuestaoResultados)
+                .FirstOrDefaultAsync(e => e.Id == execucaoId);
+
+            if (execucao == null)
+                throw new KeyNotFoundException("Execução não encontrada");
+
+            var aluno = await _context.Users.FindAsync(execucao.UserId);
+            var atividade = await _context.Atividades.FindAsync(execucao.AtividadeId);
+
+            // Tentar obter questões do JSON da atividade ou da execução
+            List<QuestaoEditadaDto>? questoesDesserializadas = null;
+            var questoesJsonSource = atividade?.QuestoesJson ?? execucao.QuestoesJson;
+            if (!string.IsNullOrEmpty(questoesJsonSource))
+            {
+                try
+                {
+                    questoesDesserializadas = JsonSerializer.Deserialize<List<QuestaoEditadaDto>>(questoesJsonSource,
+                        new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                }
+                catch { /* ignora falha de deserialização */ }
+            }
+
+            var questoesDetalhes = new List<QuestaoResultadoDetalheDto>();
+
+            if (execucao.QuestaoResultados != null && execucao.QuestaoResultados.Count > 0)
+            {
+                foreach (var qr in execucao.QuestaoResultados.OrderBy(q => q.NumeroQuestao))
+                {
+                    var questaoOriginal = questoesDesserializadas?.FirstOrDefault(q => q.Numero == qr.NumeroQuestao);
+                    questoesDetalhes.Add(new QuestaoResultadoDetalheDto
+                    {
+                        NumeroQuestao = qr.NumeroQuestao,
+                        Enunciado = questaoOriginal?.Enunciado,
+                        RespostaAluno = qr.RespostaAluno,
+                        RespostaCorreta = qr.RespostaCorreta,
+                        Resultado = qr.Resultado,
+                        Alternativas = questaoOriginal?.Alternativas
+                    });
+                }
+            }
+            else if (questoesDesserializadas != null)
+            {
+                // Fallback: montar a partir dos JSONs armazenados
+                List<RespostaAlunoDto>? respostasDesserializadas = null;
+                var respostasJsonSource = execucao.RespostasJson;
+                if (!string.IsNullOrEmpty(respostasJsonSource))
+                {
+                    try
+                    {
+                        respostasDesserializadas = JsonSerializer.Deserialize<List<RespostaAlunoDto>>(respostasJsonSource,
+                            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                    }
+                    catch { /* ignora */ }
+                }
+
+                List<GabaritoItemDto>? gabaritoDesserializado = null;
+                var gabaritoJsonSource = atividade?.GabaritoJson ?? execucao.GabaritoJson;
+                if (!string.IsNullOrEmpty(gabaritoJsonSource))
+                {
+                    try
+                    {
+                        gabaritoDesserializado = JsonSerializer.Deserialize<List<GabaritoItemDto>>(gabaritoJsonSource,
+                            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                    }
+                    catch { /* ignora */ }
+                }
+
+                foreach (var q in questoesDesserializadas)
+                {
+                    var respAluno = respostasDesserializadas?.FirstOrDefault(r => r.Questao == q.Numero)?.Resposta;
+                    var gabItem = gabaritoDesserializado?.FirstOrDefault(g => g.Questao == q.Numero);
+                    var acertou = gabItem != null && string.Equals(respAluno?.Trim(), gabItem.RespostaCorreta?.Trim(), StringComparison.OrdinalIgnoreCase);
+
+                    questoesDetalhes.Add(new QuestaoResultadoDetalheDto
+                    {
+                        NumeroQuestao = q.Numero,
+                        Enunciado = q.Enunciado,
+                        RespostaAluno = respAluno,
+                        RespostaCorreta = gabItem?.RespostaCorreta ?? q.RespostaCorreta,
+                        Resultado = respAluno == null ? "Pulou" : (acertou ? "Acerto" : "Erro"),
+                        Alternativas = q.Alternativas
+                    });
+                }
+            }
+
+            return new ExecucaoDetalhadaDto
+            {
+                ExecucaoId = execucao.Id,
+                AlunoId = execucao.UserId,
+                AlunoNome = aluno?.Nome ?? "",
+                AtividadeId = execucao.AtividadeId,
+                AtividadeNome = atividade?.Nome ?? "",
+                TotalQuestoes = execucao.TotalQuestoes,
+                Acertos = execucao.Acertos,
+                Erros = execucao.Erros,
+                Nota = execucao.Nota,
+                Status = execucao.Status,
+                DataFim = execucao.DataFim,
+                Questoes = questoesDetalhes
             };
         }
     }

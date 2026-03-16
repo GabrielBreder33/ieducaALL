@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authService } from '../../services/authService';
 import { professorService } from '../../services/professorService';
-import type { AtribuicaoAtividade, CriarAtividadeProfessor } from '../../services/professorService';
+import type { AtribuicaoAtividade, CriarAtividadeProfessor, GerarAtividadeProfessor, AtividadeComQuestoes } from '../../services/professorService';
 import { conhecimentoService } from '../../services/conhecimentoService';
 import type { Materia, AreaConhecimento } from '../../services/conhecimentoService';
 import type { User } from '../../types';
@@ -20,6 +20,7 @@ export default function GerenciarAtividades() {
   const [professor, setProfessor] = useState<User | null>(null);
   const [darkMode] = useState(false);
   const [atribuicoes, setAtribuicoes] = useState<AtribuicaoAtividade[]>([]);
+  const [rascunhos, setRascunhos] = useState<AtividadeComQuestoes[]>([]);
   const [alunos, setAlunos] = useState<Aluno[]>([]);
   const [areas, setAreas] = useState<AreaConhecimento[]>([]);
   const [materias, setMaterias] = useState<Materia[]>([]);
@@ -60,14 +61,16 @@ export default function GerenciarAtividades() {
   const carregarDados = async (professorId: number, escolaId: number) => {
     setLoading(true);
     try {
-      const [atribResult, alunosResult, areasResult] = await Promise.allSettled([
+      const [atribResult, alunosResult, areasResult, rascResult] = await Promise.allSettled([
         professorService.listarAtribuicoesProfessor(professorId),
         fetch(`${API_URL}/User/escola/${escolaId}/alunos`).then(r => r.json()),
         conhecimentoService.getAreasConhecimento(),
+        professorService.listarRascunhos(professorId),
       ]);
       if (atribResult.status === 'fulfilled') setAtribuicoes(atribResult.value);
       if (alunosResult.status === 'fulfilled') setAlunos(alunosResult.value);
       if (areasResult.status === 'fulfilled') setAreas(areasResult.value);
+      if (rascResult.status === 'fulfilled') setRascunhos(rascResult.value);
 
       if (atribResult.status === 'rejected' && alunosResult.status === 'rejected' && areasResult.status === 'rejected') {
         setMensagem({ tipo: 'erro', texto: 'Erro ao carregar dados' });
@@ -103,32 +106,22 @@ export default function GerenciarAtividades() {
     setSalvando(true);
     setMensagem(null);
     try {
-      await professorService.criarAtividade({
-        ...form,
-        alunoId: form.alunoId || undefined,
-        prazo: form.prazo || undefined,
-      });
-      setMensagem({ tipo: 'sucesso', texto: 'Atividade criada com sucesso!' });
+      const dto: GerarAtividadeProfessor = {
+        nome: form.nome,
+        descricao: form.descricao,
+        materiaId: form.materiaId,
+        tipo: form.tipo,
+        nivelDificuldade: form.nivelDificuldade,
+        totalQuestoes: form.totalQuestoes,
+        professorId: form.professorId,
+        escolaId: form.escolaId,
+        conteudo: form.descricao || form.nome,
+      };
+      const atividade = await professorService.gerarAtividadeComIA(dto);
       setShowModal(false);
-      setForm(prev => ({
-        ...prev,
-        nome: '',
-        descricao: '',
-        materiaId: 0,
-        tipo: 'Quiz',
-        nivelDificuldade: 'Fácil',
-        totalQuestoes: 10,
-        alunoId: undefined,
-        prazo: '',
-        instrucoes: '',
-      }));
-      // Recarregar
-      if (professor?.id) {
-        const atribData = await professorService.listarAtribuicoesProfessor(professor.id);
-        setAtribuicoes(atribData);
-      }
+      navigate(`/professor/atividades/${atividade.id}/revisar?nova=1`);
     } catch (err: any) {
-      setMensagem({ tipo: 'erro', texto: err.message || 'Erro ao criar atividade' });
+      setMensagem({ tipo: 'erro', texto: err.message || 'Erro ao gerar atividade com IA' });
     } finally {
       setSalvando(false);
     }
@@ -166,7 +159,6 @@ export default function GerenciarAtividades() {
     <div className={`min-h-screen overflow-x-hidden w-full transition-colors ${
       darkMode ? 'bg-slate-900' : 'bg-slate-50'
     }`}>
-      {/* Header */}
       <div className={`sticky top-0 z-40 flex justify-between items-center px-3 sm:px-6 py-3 sm:py-4 backdrop-blur-lg border-b transition-colors ${
         darkMode ? 'bg-slate-800/80 border-slate-700 shadow-lg' : 'bg-white/90 border-slate-300 shadow-sm'
       }`}>
@@ -185,7 +177,6 @@ export default function GerenciarAtividades() {
       </div>
 
       <div className="max-w-7xl mx-auto p-3 sm:p-5">
-        {/* Mensagem */}
         {mensagem && (
           <div className={`mb-4 p-4 rounded-xl font-medium ${
             mensagem.tipo === 'sucesso' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
@@ -194,7 +185,6 @@ export default function GerenciarAtividades() {
           </div>
         )}
 
-        {/* Botão Criar */}
         <div className="mb-6 flex justify-end">
           <button
             onClick={() => setShowModal(true)}
@@ -207,7 +197,44 @@ export default function GerenciarAtividades() {
           </button>
         </div>
 
-        {/* Lista de Atribuições */}
+        {rascunhos.length > 0 && (
+          <div className="mb-6">
+            <h2 className={`text-lg font-bold mb-3 flex items-center gap-2 ${darkMode ? 'text-white' : 'text-slate-900'}`}>
+              <span className="w-2 h-2 rounded-full bg-amber-400 inline-block"></span>
+              Rascunhos pendentes
+              <span className="text-sm font-normal text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+                {rascunhos.length} {rascunhos.length === 1 ? 'atividade' : 'atividades'} gerada{rascunhos.length !== 1 ? 's' : ''} com IA aguardando envio
+              </span>
+            </h2>
+            <div className="grid gap-3">
+              {rascunhos.map(rasc => (
+                <div key={rasc.id} className={`rounded-2xl p-4 border-2 border-dashed flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                  darkMode ? 'bg-amber-900/10 border-amber-700' : 'bg-amber-50 border-amber-300'
+                }`}>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
+                      <h3 className={`font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>{rasc.nome}</h3>
+                      <span className="px-2 py-0.5 text-xs font-bold rounded-full bg-amber-100 text-amber-700">Rascunho</span>
+                    </div>
+                    <div className={`flex flex-wrap gap-3 text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                      <span>📚 {rasc.materiaNome}</span>
+                      <span>🎯 {rasc.nivelDificuldade}</span>
+                      <span>❓ {rasc.totalQuestoes} questões</span>
+                      <span>📅 {new Date(rasc.criadoEm).toLocaleDateString('pt-BR')}</span>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => navigate(`/professor/atividades/${rasc.id}/revisar`)}
+                    className="self-start sm:self-center px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white text-sm font-bold rounded-xl transition-colors"
+                  >
+                    Continuar
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {loading ? (
           <div className={`text-center py-12 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Carregando...</div>
         ) : atribuicoes.length === 0 ? (
@@ -254,14 +281,22 @@ export default function GerenciarAtividades() {
                       </p>
                     )}
                   </div>
-                  {atrib.status === 'Ativa' && (
+                  <div className="flex flex-col sm:flex-row gap-2 self-start">
                     <button
-                      onClick={() => handleEncerrar(atrib.id)}
-                      className="self-start px-4 py-2 bg-red-500 text-white text-sm font-medium rounded-lg hover:bg-red-600 transition-colors"
+                      onClick={() => navigate(`/professor/atividades/${atrib.atividadeId}/resultados`)}
+                      className="px-4 py-2 bg-indigo-500 text-white text-sm font-medium rounded-lg hover:bg-indigo-600 transition-colors"
                     >
-                      Encerrar
+                      Ver Respostas
                     </button>
-                  )}
+                    {atrib.status === 'Ativa' && (
+                      <button
+                        onClick={() => handleEncerrar(atrib.id)}
+                        className="px-4 py-2 bg-red-500 text-white text-sm font-medium rounded-lg hover:bg-red-600 transition-colors"
+                      >
+                        Encerrar
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}
@@ -269,7 +304,6 @@ export default function GerenciarAtividades() {
         )}
       </div>
 
-      {/* Modal Criar Atividade */}
       {showModal && (
         <CriarAtividadeModal
           darkMode={darkMode}

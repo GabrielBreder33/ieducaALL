@@ -32,6 +32,9 @@ namespace ServiceIEDUCA.Data
         public DbSet<ProfessorCompetenciaRevisao> ProfessorCompetenciaRevisoes { get; set; }
         public DbSet<ProfessorRedacaoGrifo> ProfessorRedacaoGrifos { get; set; }
 
+        // Notificações
+        public DbSet<Notificacao> Notificacoes { get; set; }
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -221,6 +224,15 @@ namespace ServiceIEDUCA.Data
                 entity.HasIndex(e => e.FkRedacao)
                     .IsUnique()
                     .HasDatabaseName("IX_RedacaoCustos_FkRedacao");
+            });
+
+            // Configuração: Notificacao
+            modelBuilder.Entity<Notificacao>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.CriadoEm).HasDefaultValueSql("CURRENT_TIMESTAMP");
+                entity.HasIndex(e => new { e.UserId, e.Lida })
+                    .HasDatabaseName("IX_Notificacoes_UserId_Lida");
             });
         }
     }

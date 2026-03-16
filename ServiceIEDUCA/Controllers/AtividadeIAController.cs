@@ -684,6 +684,30 @@ IMPORTANTE: Retorne APENAS o JSON, sem texto adicional antes ou depois.";
                 _context.AtividadeExecucoes.Add(execucao);
                 await _context.SaveChangesAsync();
 
+                // Salvar resultados por questão em AtividadeQuestaoResultados
+                if (request.Gabarito != null && request.Respostas != null)
+                {
+                    foreach (var resposta in request.Respostas)
+                    {
+                        var gabaritoItem = request.Gabarito.FirstOrDefault(g => g.Questao == resposta.Questao);
+                        var acertouQuestao = gabaritoItem != null && string.Equals(
+                            resposta.Resposta?.Trim(),
+                            gabaritoItem.RespostaCorreta?.Trim(),
+                            StringComparison.OrdinalIgnoreCase);
+
+                        _context.AtividadeQuestaoResultados.Add(new AtividadeQuestaoResultados
+                        {
+                            ExecucaoId = execucao.Id,
+                            NumeroQuestao = resposta.Questao,
+                            Resultado = acertouQuestao ? "Acerto" : "Erro",
+                            RespostaAluno = resposta.Resposta,
+                            RespostaCorreta = gabaritoItem?.RespostaCorreta,
+                            CriadoEm = DateTime.UtcNow
+                        });
+                    }
+                    await _context.SaveChangesAsync();
+                }
+
                 _logger.LogInformation($"Atividade salva com sucesso. ID: {execucao.Id}, Nota: {nota}, Acertos: {acertos}/{totalQuestoes}");
 
                 var resultado = new

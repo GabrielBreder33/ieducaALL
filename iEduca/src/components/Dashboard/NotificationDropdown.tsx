@@ -1,20 +1,33 @@
-import { useState, useEffect, useRef } from 'react';
-
-interface Notification {
-  id: number;
-  message: string;
-  timestamp: Date;
-  read: boolean;
-}
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { professorService } from '../../services/professorService';
+import type { Notificacao } from '../../services/professorService';
+import { authService } from '../../services/authService';
 
 interface NotificationDropdownProps {
   darkMode: boolean;
 }
 
 export default function NotificationDropdown({ darkMode }: NotificationDropdownProps) {
+  const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
-  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [notifications, setNotifications] = useState<Notificacao[]>([]);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const loadNotifications = useCallback(async () => {
+    const user = authService.getCurrentUser();
+    if (!user?.id) return;
+    try {
+      const data = await professorService.listarNotificacoes(user.id);
+      setNotifications(data);
+    } catch { /* silencioso */ }
+  }, []);
+
+  useEffect(() => {
+    loadNotifications();
+    const interval = setInterval(loadNotifications, 30000); // Poll a cada 30s
+    return () => clearInterval(interval);
+  }, [loadNotifications]);
 
   // Fechar dropdown ao clicar fora
   useEffect(() => {
@@ -33,16 +46,20 @@ export default function NotificationDropdown({ darkMode }: NotificationDropdownP
     };
   }, [isOpen]);
 
-  const unreadCount = notifications.filter(n => !n.read).length;
+  const unreadCount = notifications.filter(n => !n.lida).length;
 
-  const handleMarkAsRead = (id: number) => {
-    setNotifications(notifications.map(n => 
-      n.id === id ? { ...n, read: true } : n
-    ));
+  const handleMarkAsRead = async (id: number) => {
+    const user = authService.getCurrentUser();
+    if (!user?.id) return;
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, lida: true } : n));
+    try { await professorService.marcarNotificacaoLida(id, user.id); } catch { /* silencioso */ }
   };
 
-  const handleMarkAllAsRead = () => {
-    setNotifications(notifications.map(n => ({ ...n, read: true })));
+  const handleMarkAllAsRead = async () => {
+    const user = authService.getCurrentUser();
+    if (!user?.id) return;
+    setNotifications(prev => prev.map(n => ({ ...n, lida: true })));
+    try { await professorService.marcarTodasLidas(user.id); } catch { /* silencioso */ }
   };
 
   return (
@@ -106,33 +123,43 @@ export default function NotificationDropdown({ darkMode }: NotificationDropdownP
               notifications.map((notification) => (
                 <div
                   key={notification.id}
-                  onClick={() => handleMarkAsRead(notification.id)}
+                  onClick={() => {
+                    handleMarkAsRead(notification.id);
+                    if (notification.referenciaId) {
+                      if (notification.tipo === 'redacao') {
+                        navigate(`/aluno/redacao/${notification.referenciaId}`);
+                      } else if (notification.tipo === 'atividade') {
+                        navigate('/aluno/atividades');
+                      }
+                      setIsOpen(false);
+                    }
+                  }}
                   className={`px-4 py-3 border-b cursor-pointer transition-colors ${
                     darkMode 
                       ? 'border-slate-700 hover:bg-slate-700/50' 
                       : 'border-slate-100 hover:bg-slate-50'
                   } ${
-                    !notification.read 
+                    !notification.lida 
                       ? darkMode ? 'bg-slate-700/30' : 'bg-blue-50' 
                       : ''
                   }`}
                 >
                   <div className="flex gap-3">
                     <div className="flex-shrink-0">
-                      {!notification.read && (
+                      {!notification.lida && (
                         <div className="w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className={`text-sm ${
                         darkMode ? 'text-slate-200' : 'text-slate-800'
-                      } ${!notification.read ? 'font-medium' : ''}`}>
-                        {notification.message}
+                      } ${!notification.lida ? 'font-medium' : ''}`}>
+                        {notification.mensagem}
                       </p>
                       <p className={`text-xs mt-1 ${
                         darkMode ? 'text-slate-500' : 'text-slate-400'
                       }`}>
-                        {notification.timestamp.toLocaleString('pt-BR')}
+                        {new Date(notification.criadoEm).toLocaleString('pt-BR')}
                       </p>
                     </div>
                   </div>

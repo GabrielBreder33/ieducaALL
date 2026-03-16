@@ -446,40 +446,6 @@ export default function EscolaDashboard() {
           }`}>IEDUCA</h1>
         </div>
 
-        <div className={`hidden sm:flex items-center gap-3 rounded-full p-1.5 transition-colors ${
-          darkMode ? 'bg-slate-700/50' : 'bg-slate-200'
-        }`}>
-          <button 
-            onClick={() => setDarkMode(false)}
-            className={`p-2 rounded-full transition-all ${
-              !darkMode ? 'bg-white shadow-lg text-yellow-500' : 'text-slate-400 hover:bg-slate-600'
-            }`}
-          >
-            ☀️
-          </button>
-          <div className="relative inline-block w-14 h-7">
-            <input 
-              type="checkbox" 
-              checked={darkMode}
-              onChange={(e) => setDarkMode(e.target.checked)}
-              className="sr-only peer" 
-            />
-            <div className={`w-14 h-7 rounded-full peer peer-focus:ring-2 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:rounded-full after:h-6 after:w-6 after:transition-all ${
-              darkMode 
-                ? 'bg-blue-600 peer-focus:ring-blue-300 after:bg-white'
-                : 'bg-slate-300 peer-focus:ring-slate-400 after:bg-white'
-            }`}></div>
-          </div>
-          <button 
-            onClick={() => setDarkMode(true)}
-            className={`p-2 rounded-full transition-all ${
-              darkMode ? 'bg-slate-600 shadow-lg text-blue-400' : 'text-slate-400 hover:bg-slate-300'
-            }`}
-          >
-            🌙
-          </button>
-        </div>
-
         <div className="flex items-center gap-2 sm:gap-4">
           <NotificationDropdown darkMode={darkMode} />
           <button

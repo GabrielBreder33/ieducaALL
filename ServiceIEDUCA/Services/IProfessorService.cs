@@ -11,6 +11,18 @@ namespace ServiceIEDUCA.Services
         Task<List<AtribuicaoAtividadeDto>> ListarAtribuicoesAlunoAsync(int alunoId, int escolaId);
         Task<bool> EncerrarAtribuicaoAsync(int atribuicaoId, int professorId);
 
+        // Atividade com IA (Professor)
+        Task<AtividadeComQuestoesDto> GerarAtividadeComIAAsync(GerarAtividadeProfessorDto dto);
+        Task<List<AtividadeComQuestoesDto>> ListarRascunhosProfessorAsync(int professorId);
+        Task<AtividadeComQuestoesDto> ObterAtividadeComQuestoesAsync(int atividadeId);
+        Task<AtividadeComQuestoesDto> AtualizarQuestoesAsync(int atividadeId, int professorId, List<QuestaoEditadaDto> questoes);
+        Task<AtribuicaoAtividadeDto> ConfirmarEEnviarAtividadeAsync(ConfirmarAtividadeProfessorDto dto);
+
+        // Notificações
+        Task<List<NotificacaoDto>> ListarNotificacoesAsync(int userId);
+        Task MarcarNotificacaoLidaAsync(int notificacaoId, int userId);
+        Task MarcarTodasLidasAsync(int userId);
+
         Task<List<RedacaoAlunoListDto>> ListarRedacoesAlunosAsync(int escolaId);
         Task<ProfessorRedacaoRevisaoDto> CriarRevisaoRedacaoAsync(CriarRevisaoRedacaoDto dto);
         Task<ProfessorRedacaoRevisaoDto> AtualizarRevisaoRedacaoAsync(int revisaoId, int professorId, AtualizarRevisaoRedacaoDto dto);
@@ -18,5 +30,9 @@ namespace ServiceIEDUCA.Services
 
         Task<List<GrifoDto>> SalvarGrifosAsync(SalvarGrifosDto dto);
         Task<List<GrifoDto>> ObterGrifosAsync(int redacaoCorrecaoId);
+
+        // Visualização de execuções (Professor)
+        Task<List<ExecucaoAlunoResumoDto>> ListarExecucoesPorAtividadeAsync(int atividadeId, int professorId);
+        Task<ExecucaoDetalhadaDto> ObterExecucaoDetalhadaAsync(int execucaoId, int professorId);
     }
 }

@@ -14,6 +14,8 @@ import ProfessorDashboard from './pages/Professor/Dashboard';
 import GerenciarAtividades from './pages/Professor/GerenciarAtividades';
 import CorrigirRedacoes from './pages/Professor/CorrigirRedacoes';
 import CorrigirRedacao from './pages/Professor/CorrigirRedacao';
+import RevisarAtividade from './pages/Professor/RevisarAtividade';
+import VerResultadosAtividade from './pages/Professor/VerResultadosAtividade';
 import PrivateRoute from './components/PrivateRoute';
 
 function App() {
@@ -25,6 +27,8 @@ function App() {
         <Route path="/escola/dashboard" element={<EscolaDashboard />} />
         <Route path="/professor/dashboard" element={<ProfessorDashboard />} />
         <Route path="/professor/atividades" element={<GerenciarAtividades />} />
+        <Route path="/professor/atividades/:atividadeId/revisar" element={<RevisarAtividade />} />
+        <Route path="/professor/atividades/:atividadeId/resultados" element={<VerResultadosAtividade />} />
         <Route path="/professor/redacoes" element={<CorrigirRedacoes />} />
         <Route path="/professor/redacoes/:id" element={<CorrigirRedacao />} />
         <Route path="/aluno/estudos" element={<Estudos />} />

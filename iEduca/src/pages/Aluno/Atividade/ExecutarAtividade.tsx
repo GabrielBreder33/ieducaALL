@@ -155,8 +155,8 @@ export default function ExecutarAtividade() {
         resposta: r.resposta
       }));
       
-      // Gerar ID único da atividade (pode usar timestamp + userId)
-      const atividadeId = `${user.id}_${Date.now()}`;
+      // Usar o ID real da atividade (vindo do professor ou gerado)
+      const atividadeId = atividade.id;
       
       // Corrigir e salvar a atividade
       await aiService.corrigirAtividade(

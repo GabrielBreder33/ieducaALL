@@ -32,6 +32,106 @@ export interface CriarAtividadeProfessor {
   instrucoes?: string;
 }
 
+export interface GerarAtividadeProfessor {
+  nome: string;
+  descricao?: string;
+  materiaId: number;
+  tipo: string;
+  nivelDificuldade: string;
+  totalQuestoes: number;
+  professorId: number;
+  escolaId: number;
+  conteudo?: string;
+}
+
+export interface Alternativa {
+  id: string;
+  texto: string;
+}
+
+export interface QuestaoEditada {
+  numero: number;
+  enunciado: string;
+  alternativas: Alternativa[];
+  respostaCorreta: string;
+}
+
+export interface GabaritoItem {
+  questao: number;
+  respostaCorreta: string;
+}
+
+export interface AtividadeComQuestoes {
+  id: number;
+  nome: string;
+  descricao?: string;
+  tipo: string;
+  nivelDificuldade: string;
+  totalQuestoes: number;
+  materiaNome: string;
+  materiaId: number;
+  questoes: QuestaoEditada[];
+  gabarito: GabaritoItem[];
+  criadoEm: string;
+}
+
+export interface ConfirmarAtividadeProfessor {
+  atividadeId: number;
+  professorId: number;
+  alunoId?: number;
+  prazo?: string;
+  instrucoes?: string;
+  questoesEditadas?: QuestaoEditada[];
+}
+
+export interface Notificacao {
+  id: number;
+  mensagem: string;
+  tipo: string;
+  referenciaId?: number;
+  referenciaTipo?: string;
+  lida: boolean;
+  criadoEm: string;
+}
+
+export interface ExecucaoAlunoResumo {
+  execucaoId: number;
+  alunoId: number;
+  alunoNome: string;
+  atividadeId: number;
+  atividadeNome: string;
+  totalQuestoes: number;
+  acertos: number;
+  erros: number;
+  nota?: number;
+  status: string;
+  dataFim?: string;
+}
+
+export interface QuestaoResultadoDetalhe {
+  numeroQuestao: number;
+  enunciado?: string;
+  respostaAluno?: string;
+  respostaCorreta?: string;
+  resultado: string;
+  alternativas?: Alternativa[];
+}
+
+export interface ExecucaoDetalhada {
+  execucaoId: number;
+  alunoId: number;
+  alunoNome: string;
+  atividadeId: number;
+  atividadeNome: string;
+  totalQuestoes: number;
+  acertos: number;
+  erros: number;
+  nota?: number;
+  status: string;
+  dataFim?: string;
+  questoes: QuestaoResultadoDetalhe[];
+}
+
 export interface RedacaoAlunoList {
   id: number;
   alunoId: number;
@@ -171,6 +271,78 @@ class ProfessorService {
     return response.json();
   }
 
+  // --- Atividade com IA ---
+
+  async gerarAtividadeComIA(dto: GerarAtividadeProfessor): Promise<AtividadeComQuestoes> {
+    const response = await fetch(`${API_URL}/Professor/atividades/gerar-ia`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(dto),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.message || 'Erro ao gerar atividade com IA');
+    }
+    return response.json();
+  }
+
+  async listarRascunhos(professorId: number): Promise<AtividadeComQuestoes[]> {
+    const response = await fetch(`${API_URL}/Professor/atividades/rascunhos/${professorId}`);
+    if (!response.ok) return [];
+    return response.json();
+  }
+
+  async obterAtividadeComQuestoes(atividadeId: number): Promise<AtividadeComQuestoes> {
+    const response = await fetch(`${API_URL}/Professor/atividades/${atividadeId}/questoes`);
+    if (!response.ok) throw new Error('Erro ao obter atividade');
+    return response.json();
+  }
+
+  async atualizarQuestoes(atividadeId: number, professorId: number, questoes: QuestaoEditada[]): Promise<AtividadeComQuestoes> {
+    const response = await fetch(
+      `${API_URL}/Professor/atividades/${atividadeId}/questoes?professorId=${professorId}`,
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(questoes),
+      }
+    );
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.message || 'Erro ao atualizar questões');
+    }
+    return response.json();
+  }
+
+  async confirmarEEnviarAtividade(dto: ConfirmarAtividadeProfessor): Promise<AtribuicaoAtividade> {
+    const response = await fetch(`${API_URL}/Professor/atividades/confirmar`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(dto),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.message || 'Erro ao confirmar atividade');
+    }
+    return response.json();
+  }
+
+  // --- Notificações ---
+
+  async listarNotificacoes(userId: number): Promise<Notificacao[]> {
+    const response = await fetch(`${API_URL}/Professor/notificacoes/${userId}`);
+    if (!response.ok) throw new Error('Erro ao listar notificações');
+    return response.json();
+  }
+
+  async marcarNotificacaoLida(notificacaoId: number, userId: number): Promise<void> {
+    await fetch(`${API_URL}/Professor/notificacoes/${notificacaoId}/lida?userId=${userId}`, { method: 'PUT' });
+  }
+
+  async marcarTodasLidas(userId: number): Promise<void> {
+    await fetch(`${API_URL}/Professor/notificacoes/marcar-todas/${userId}`, { method: 'PUT' });
+  }
+
   // --- Redações ---
 
   async listarRedacoesAlunos(escolaId: number): Promise<RedacaoAlunoList[]> {
@@ -243,6 +415,20 @@ class ProfessorService {
   async obterGrifos(redacaoCorrecaoId: number): Promise<GrifoResponse[]> {
     const response = await fetch(`${API_URL}/Professor/redacoes/grifos/${redacaoCorrecaoId}`);
     if (!response.ok) throw new Error('Erro ao obter grifos');
+    return response.json();
+  }
+
+  // --- Execuções de alunos (visualização professor) ---
+
+  async listarExecucoesAtividade(atividadeId: number, professorId: number): Promise<ExecucaoAlunoResumo[]> {
+    const response = await fetch(`${API_URL}/Professor/atividades/${atividadeId}/execucoes?professorId=${professorId}`);
+    if (!response.ok) throw new Error('Erro ao listar execuções');
+    return response.json();
+  }
+
+  async obterExecucaoDetalhada(execucaoId: number, professorId: number): Promise<ExecucaoDetalhada> {
+    const response = await fetch(`${API_URL}/Professor/atividades/execucao/${execucaoId}/detalhes?professorId=${professorId}`);
+    if (!response.ok) throw new Error('Erro ao obter detalhes da execução');
     return response.json();
   }
 }

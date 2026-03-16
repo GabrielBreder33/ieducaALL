@@ -153,6 +153,43 @@ export default function Atividade() {
     }
   };
 
+  const iniciarAtividadeProfessor = async (atrib: AtribuicaoAtividade) => {
+    try {
+      const dados = await professorService.obterAtividadeComQuestoes(atrib.atividadeId);
+      const atividadeFormatada = {
+        id: String(dados.id),
+        configuracao: {
+          materia: dados.materiaNome,
+          segmento: 'Ensino Médio',
+          ano: '1º EM',
+          conteudo: dados.descricao || dados.nome,
+          nivel: dados.nivelDificuldade,
+          quantidade: dados.totalQuestoes,
+          tipo: dados.tipo,
+          explicacao: true
+        },
+        questoes: dados.questoes.map(q => ({
+          numero: q.numero,
+          enunciado: q.enunciado,
+          alternativas: q.alternativas.map(a => ({ letra: a.id, texto: a.texto }))
+        })),
+        gabarito: dados.gabarito.map(g => ({
+          questao: g.questao,
+          respostaCorreta: g.respostaCorreta,
+          explicacao: ''
+        })),
+        criadaEm: dados.criadoEm,
+        atribuicaoId: atrib.id,
+        professorNome: atrib.professorNome
+      };
+      localStorage.setItem('atividadeAtual', JSON.stringify(atividadeFormatada));
+      navigate(`/aluno/atividade/${dados.id}`);
+    } catch (error) {
+      console.error('Erro ao carregar atividade do professor:', error);
+      alert('Erro ao carregar atividade. Tente novamente.');
+    }
+  };
+
   const handleLogout = () => {
     authService.logout();
     navigate('/login');
@@ -348,7 +385,7 @@ export default function Atividade() {
                               </div>
                             </div>
                             <button
-                              onClick={() => navigate(`/aluno/atividade/gerar-ia?atribuicaoId=${atrib.id}&atividadeId=${atrib.atividadeId}`)}
+                              onClick={() => iniciarAtividadeProfessor(atrib)}
                               className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl transition-colors flex-shrink-0"
                             >
                               Iniciar

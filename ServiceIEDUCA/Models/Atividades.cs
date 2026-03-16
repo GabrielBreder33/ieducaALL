@@ -35,6 +35,11 @@ namespace ServiceIEDUCA.Models
 
         public DateTime? AtualizadoEm { get; set; }
 
+        // Questões geradas por IA (JSON) — para atividades criadas pelo professor
+        public string? QuestoesJson { get; set; }
+        public string? GabaritoJson { get; set; }
+        public string? ExplicacoesJson { get; set; }
+
         // Relacionamento
         [ForeignKey("MateriaId")]
         public virtual Materias? Materia { get; set; }
