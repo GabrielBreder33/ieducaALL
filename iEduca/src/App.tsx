@@ -16,7 +16,8 @@ import CorrigirRedacoes from './pages/Professor/CorrigirRedacoes';
 import CorrigirRedacao from './pages/Professor/CorrigirRedacao';
 import RevisarAtividade from './pages/Professor/RevisarAtividade';
 import VerResultadosAtividade from './pages/Professor/VerResultadosAtividade';
-import PrivateRoute from './components/PrivateRoute';
+import MaterialPage from './pages/Professor/Material';
+
 
 function App() {
   return (
@@ -29,6 +30,7 @@ function App() {
         <Route path="/professor/atividades" element={<GerenciarAtividades />} />
         <Route path="/professor/atividades/:atividadeId/revisar" element={<RevisarAtividade />} />
         <Route path="/professor/atividades/:atividadeId/resultados" element={<VerResultadosAtividade />} />
+        <Route path="/professor/material" element={<MaterialPage />} />
         <Route path="/professor/redacoes" element={<CorrigirRedacoes />} />
         <Route path="/professor/redacoes/:id" element={<CorrigirRedacao />} />
         <Route path="/aluno/estudos" element={<Estudos />} />

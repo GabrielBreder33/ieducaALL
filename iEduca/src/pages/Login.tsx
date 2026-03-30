@@ -16,7 +16,6 @@ export default function Login() {
     e.preventDefault();
     setError('');
     setLoading(true);
-
     try {
       if (loginType === 'escola') {
         // Login como escola

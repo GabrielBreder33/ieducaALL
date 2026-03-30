@@ -462,6 +462,12 @@ namespace ServiceIEDUCA.Services
             if (materia == null)
                 throw new ArgumentException("Matéria não encontrada");
 
+            // Se tem MaterialId, criar atividade a partir das questões do material
+            if (dto.MaterialId.HasValue && dto.MaterialId.Value > 0)
+            {
+                return await CriarAtividadeDoMaterialAsync(dto, materia, professor);
+            }
+
             // Gerar questões com IA
             var prompt = $@"Gere {dto.TotalQuestoes} questões de múltipla escolha sobre {dto.Conteudo ?? dto.Nome} para {materia.Nome}.
 
@@ -582,6 +588,108 @@ IMPORTANTE: Retorne APENAS o JSON, sem texto adicional.";
 
             _logger.LogInformation("Professor {ProfessorId} gerou atividade {AtividadeId} com {Count} questões via IA",
                 dto.ProfessorId, atividade.Id, questoes.Count);
+
+            return new AtividadeComQuestoesDto
+            {
+                Id = atividade.Id,
+                Nome = atividade.Nome,
+                Descricao = atividade.Descricao,
+                Tipo = atividade.Tipo,
+                NivelDificuldade = atividade.NivelDificuldade,
+                TotalQuestoes = questoes.Count,
+                MateriaNome = materia.Nome,
+                MateriaId = atividade.MateriaId,
+                Questoes = questoes,
+                Gabarito = gabarito,
+                CriadoEm = atividade.CriadoEm
+            };
+        }
+
+        private async Task<AtividadeComQuestoesDto> CriarAtividadeDoMaterialAsync(
+            GerarAtividadeProfessorDto dto, Materias materia, User professor)
+        {
+            var material = await _context.Materiais.FindAsync(dto.MaterialId!.Value);
+            if (material == null || material.ProfessorId != dto.ProfessorId)
+                throw new ArgumentException("Material não encontrado ou não pertence ao professor");
+
+            if (string.IsNullOrWhiteSpace(material.QuestoesJson))
+                throw new ArgumentException("Material não possui questões extraídas");
+
+            var options = new JsonSerializerOptions
+            {
+                AllowTrailingCommas = true,
+                PropertyNameCaseInsensitive = true
+            };
+
+            var parsed = JsonSerializer.Deserialize<JsonElement>(material.QuestoesJson, options);
+            if (!parsed.TryGetProperty("questoes", out var questoesArray))
+                throw new ArgumentException("Material não possui questões válidas");
+
+            var questoesMaterial = questoesArray.EnumerateArray().ToList();
+            var questoes = new List<QuestaoEditadaDto>();
+            var gabarito = new List<GabaritoItemDto>();
+
+            // Filtrar questões selecionadas ou pegar todas
+            var selecionadas = dto.QuestoesSelecionadas ?? questoesMaterial
+                .Select((_, i) => i + 1).ToList();
+
+            int numero = 0;
+            foreach (var idx in selecionadas)
+            {
+                if (idx < 1 || idx > questoesMaterial.Count) continue;
+                var q = questoesMaterial[idx - 1];
+                numero++;
+
+                var alternativas = new List<AlternativaDto>();
+                if (q.TryGetProperty("alternativas", out var alts))
+                {
+                    int altIdx = 0;
+                    foreach (var a in alts.EnumerateArray())
+                    {
+                        var letra = a.TryGetProperty("letra", out var lp) ? lp.GetString() :
+                                    a.TryGetProperty("id", out var ip) ? ip.GetString() :
+                                    ((char)('A' + altIdx)).ToString();
+                        var texto = a.TryGetProperty("texto", out var tp) ? tp.GetString() ?? "" : "";
+                        alternativas.Add(new AlternativaDto { Id = letra ?? ((char)('A' + altIdx)).ToString(), Texto = texto });
+                        altIdx++;
+                    }
+                }
+
+                var gabaritoLetra = q.TryGetProperty("gabarito", out var gp) ? gp.GetString()?.Trim().ToUpperInvariant() ?? "A" : "A";
+
+                questoes.Add(new QuestaoEditadaDto
+                {
+                    Numero = numero,
+                    Enunciado = q.TryGetProperty("enunciado", out var ep) ? ep.GetString() ?? "" : "",
+                    Alternativas = alternativas,
+                    RespostaCorreta = gabaritoLetra
+                });
+
+                gabarito.Add(new GabaritoItemDto { Questao = numero, RespostaCorreta = gabaritoLetra });
+            }
+
+            if (questoes.Count == 0)
+                throw new ArgumentException("Nenhuma questão válida selecionada");
+
+            var atividade = new Atividades
+            {
+                Nome = dto.Nome,
+                Descricao = dto.Descricao,
+                MateriaId = dto.MateriaId,
+                Tipo = dto.Tipo,
+                NivelDificuldade = dto.NivelDificuldade,
+                TotalQuestoes = questoes.Count,
+                Ativo = false,
+                QuestoesJson = JsonSerializer.Serialize(questoes),
+                GabaritoJson = JsonSerializer.Serialize(gabarito),
+                CriadoEm = DateTime.UtcNow
+            };
+
+            _context.Atividades.Add(atividade);
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("Professor {ProfessorId} criou atividade {AtividadeId} com {Count} questões do Material {MaterialId}",
+                dto.ProfessorId, atividade.Id, questoes.Count, dto.MaterialId);
 
             return new AtividadeComQuestoesDto
             {

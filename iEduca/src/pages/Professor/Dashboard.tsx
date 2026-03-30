@@ -238,6 +238,38 @@ export default function ProfessorDashboard() {
               </svg>
             </button>
           </div>
+
+          <div className="grid grid-cols-1 gap-3 mt-3">
+            <button
+              onClick={() => navigate('/professor/material')}
+              className={`flex items-center gap-4 p-4 sm:p-5 rounded-2xl text-left transition-all group ${
+                darkMode
+                  ? 'bg-slate-800 border border-slate-700 hover:border-emerald-500/50'
+                  : 'bg-white border border-slate-200 hover:border-emerald-300 hover:shadow-lg hover:shadow-emerald-100/50'
+              }`}
+            >
+              <div className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                darkMode ? 'bg-emerald-900/50' : 'bg-emerald-100'
+              }`}>
+                <svg className="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                </svg>
+              </div>
+              <div className="min-w-0">
+                <p className={`font-bold text-sm ${
+                  darkMode ? 'text-white' : 'text-slate-900'
+                }`}>Material</p>
+                <p className={`text-xs mt-0.5 ${
+                  darkMode ? 'text-slate-500' : 'text-slate-400'
+                }`}>Enviar PDFs e extrair questões</p>
+              </div>
+              <svg className={`w-4 h-4 ml-auto flex-shrink-0 transition-transform group-hover:translate-x-0.5 ${
+                darkMode ? 'text-slate-600' : 'text-slate-300'
+              }`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">

@@ -7,6 +7,17 @@ using Serilog.Events;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Configurar limite de upload para 1GB
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.Limits.MaxRequestBodySize = 1L * 1024 * 1024 * 1024;
+});
+
+builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(options =>
+{
+    options.MultipartBodyLengthLimit = 1L * 1024 * 1024 * 1024;
+});
+
 #region SERILOG
 Log.Logger = new LoggerConfiguration()
     .MinimumLevel.Debug()
@@ -35,6 +46,8 @@ builder.Services.AddScoped<IConhecimentoService, ConhecimentoService>();
 builder.Services.AddScoped<IRankingService, RankingService>();
 
 builder.Services.AddScoped<IProfessorService, ProfessorService>();
+
+builder.Services.AddScoped<IMaterialService, MaterialService>();
 
 builder.Services.AddHttpClient<IRedacaoCorrecaoService, RedacaoCorrecaoService>();
 builder.Services.AddHttpClient<IDeepSeekService, DeepSeekService>(client =>

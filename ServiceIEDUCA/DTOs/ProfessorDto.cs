@@ -142,6 +142,8 @@ namespace ServiceIEDUCA.DTOs
         public int ProfessorId { get; set; }
         public int EscolaId { get; set; }
         public string? Conteudo { get; set; } // Tema/conteúdo para gerar questões
+        public int? MaterialId { get; set; } // ID do material para usar questões
+        public List<int>? QuestoesSelecionadas { get; set; } // Números das questões selecionadas do material
     }
 
     public class ConfirmarAtividadeProfessorDto

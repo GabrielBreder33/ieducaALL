@@ -35,6 +35,9 @@ namespace ServiceIEDUCA.Data
         // Notificações
         public DbSet<Notificacao> Notificacoes { get; set; }
 
+        // Material do Professor
+        public DbSet<Material> Materiais { get; set; }
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -233,6 +236,33 @@ namespace ServiceIEDUCA.Data
                 entity.Property(e => e.CriadoEm).HasDefaultValueSql("CURRENT_TIMESTAMP");
                 entity.HasIndex(e => new { e.UserId, e.Lida })
                     .HasDatabaseName("IX_Notificacoes_UserId_Lida");
+            });
+
+            // Configuração: Material
+            modelBuilder.Entity<Material>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Nome).IsRequired().HasMaxLength(200);
+                entity.Property(e => e.Tipo).IsRequired().HasMaxLength(50);
+                entity.Property(e => e.Status).HasMaxLength(50).HasDefaultValue("Processando");
+                entity.Property(e => e.CriadoEm).HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                entity.HasOne(e => e.Professor)
+                    .WithMany()
+                    .HasForeignKey(e => e.ProfessorId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasOne(e => e.Materia)
+                    .WithMany()
+                    .HasForeignKey(e => e.MateriaId)
+                    .OnDelete(DeleteBehavior.SetNull)
+                    .IsRequired(false);
+
+                entity.HasIndex(e => e.ProfessorId)
+                    .HasDatabaseName("IX_Materiais_ProfessorId");
+
+                entity.HasIndex(e => e.Status)
+                    .HasDatabaseName("IX_Materiais_Status");
             });
         }
     }

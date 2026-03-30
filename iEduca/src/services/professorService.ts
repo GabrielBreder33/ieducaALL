@@ -42,6 +42,8 @@ export interface GerarAtividadeProfessor {
   professorId: number;
   escolaId: number;
   conteudo?: string;
+  materialId?: number;
+  questoesSelecionadas?: number[];
 }
 
 export interface Alternativa {

@@ -96,7 +96,7 @@ export default function GerenciarAtividades() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent, materialData?: { materialId: number; questoesSelecionadas: number[] }) => {
     e.preventDefault();
     if (!form.nome.trim() || form.materiaId === 0) {
       setMensagem({ tipo: 'erro', texto: 'Preencha nome e matéria' });
@@ -112,10 +112,12 @@ export default function GerenciarAtividades() {
         materiaId: form.materiaId,
         tipo: form.tipo,
         nivelDificuldade: form.nivelDificuldade,
-        totalQuestoes: form.totalQuestoes,
+        totalQuestoes: materialData ? materialData.questoesSelecionadas.length : form.totalQuestoes,
         professorId: form.professorId,
         escolaId: form.escolaId,
         conteudo: form.descricao || form.nome,
+        materialId: materialData?.materialId,
+        questoesSelecionadas: materialData?.questoesSelecionadas,
       };
       const atividade = await professorService.gerarAtividadeComIA(dto);
       setShowModal(false);
@@ -312,6 +314,7 @@ export default function GerenciarAtividades() {
           materias={materias}
           alunos={alunos}
           salvando={salvando}
+          professorId={form.professorId}
           onFormChange={setForm}
           onAreaChange={handleAreaChange}
           onSubmit={handleSubmit}
